@@ -1,0 +1,15 @@
+.env
+*.env
+data/
+*.db
+*.db-wal
+*.db-shm
+.venv/
+venv/
+.git/
+.pytest_cache/
+**/__pycache__/
+**/*.pyc
+*.egg-info/
+tests/
+docs/

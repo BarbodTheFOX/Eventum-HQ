@@ -1,0 +1,14 @@
+services:
+  bot:
+    build: .
+    image: eventum-hq:latest
+    container_name: eventum-hq
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
