@@ -139,3 +139,37 @@ def test_format_jalali_datetime() -> None:
     from eventum_hq.bot.formatters import format_jalali_datetime
 
     assert format_jalali_datetime(datetime(2026, 11, 11, 15, 0, tzinfo=UTC)) == "چهارشنبه ۱۴۰۵/۰۸/۲۰ ساعت ۱۸:۳۰"
+
+
+# ---- estimated time (F17) --------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "minutes"),
+    [
+        ("90", 90), ("۹۰", 90), ("۱۴ ساعت", 840), ("1.5h", 90), ("۱٫۵ ساعت", 90),
+        ("45 دقیقه", 45), ("2 hours", 120), ("30min", 30), ("1,5 h", 90), (" 15 ", 15),
+    ],
+)
+def test_parse_estimate(text: str, minutes: int) -> None:
+    from eventum_hq.core.jalali import parse_estimate_input
+
+    assert parse_estimate_input(text) == minutes
+
+
+@pytest.mark.parametrize("text", ["", "0", "-5", "abc", "ساعت", "1.5 روز", "99999", "12:30"])
+def test_parse_estimate_rejects_invalid(text: str) -> None:
+    from eventum_hq.core.jalali import InvalidEstimateInput, parse_estimate_input
+
+    with pytest.raises(InvalidEstimateInput):
+        parse_estimate_input(text)
+
+
+@pytest.mark.parametrize(
+    ("minutes", "text"),
+    [(None, "—"), (45, "۴۵ دقیقه"), (60, "۱ ساعت"), (90, "۱ ساعت و ۳۰ دقیقه"), (840, "۱۴ ساعت")],
+)
+def test_format_minutes(minutes: int | None, text: str) -> None:
+    from eventum_hq.bot.formatters import format_minutes
+
+    assert format_minutes(minutes) == text

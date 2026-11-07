@@ -125,3 +125,34 @@ def jalali_date_parts(day: date) -> tuple[int, int, int, int]:
     """(year, month, day, weekday Saturday=0) of a Gregorian calendar date."""
     j = jdatetime.date.fromgregorian(date=day)
     return j.year, j.month, j.day, (day.weekday() + 2) % 7
+
+
+# ---- estimated time (F17) ---------------------------------------------------------
+
+
+class InvalidEstimateInput(DomainError):
+    """Not a valid duration like '90', '۱۴ ساعت', '1.5h', '45 دقیقه'."""
+
+
+ESTIMATE_MAX_MINUTES = 200 * 60  # anything above ~200 hours is surely a typo
+
+_ESTIMATE_RE = re.compile(
+    r"^(?P<num>\d+(?:[.,]\d+)?)\s*(?P<unit>"
+    r"h|hr|hrs|hour|hours|ساعت|m|min|mins|minute|minutes|دقیقه|)$",
+    re.IGNORECASE,
+)
+_HOUR_UNITS = {"h", "hr", "hrs", "hour", "hours", "ساعت"}
+
+
+def parse_estimate_input(text: str) -> int:
+    """Return minutes. A bare number means minutes: '90' → 90, '1.5h' → 90, '۱۴ ساعت' → 840."""
+    clean = normalize_digits(text or "").strip().lower().replace("٫", ".").replace("‌", "")
+    clean = re.sub(r"\s+", " ", clean)
+    match = _ESTIMATE_RE.match(clean)
+    if match is None:
+        raise InvalidEstimateInput(text)
+    value = float(match["num"].replace(",", "."))
+    minutes = round(value * 60) if match["unit"] in _HOUR_UNITS else round(value)
+    if minutes <= 0 or minutes > ESTIMATE_MAX_MINUTES:
+        raise InvalidEstimateInput(text)
+    return minutes

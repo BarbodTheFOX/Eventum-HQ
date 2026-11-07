@@ -34,7 +34,8 @@ def test_upgrade_creates_tables_and_seed(tmp_path: Path) -> None:
         assert '"23:00"' in settings["quiet_hours"]
         assert settings["revision_returns_to_requesting_stage"] == "true"
         assert settings["owner_review_urgent_in_quiet_hours"] == "false"
-        assert len(settings) == 11
+        assert len(settings) == 12
+        assert "edit_motion_min" in settings["reel_estimates"]
 
         mode = con.execute("PRAGMA journal_mode").fetchone()[0]
         assert mode.lower() == "wal"

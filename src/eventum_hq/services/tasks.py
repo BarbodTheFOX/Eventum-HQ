@@ -19,6 +19,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from eventum_hq.core.db import Database
+from eventum_hq.core.jalali import ESTIMATE_MAX_MINUTES
 from eventum_hq.core.errors import InvalidTransition, NotFound, PermissionDenied, ValidationFailed
 from eventum_hq.core.normalize import normalize_digits
 from eventum_hq.core.timeutil import Clock, ensure_utc
@@ -80,7 +81,12 @@ class DeadlineState(StrEnum):
 
 def deadline_state(task: Task, now: datetime) -> DeadlineState:
     """Lateness is judged on the first submission only (§4.7): review queue time never counts."""
-    if task.due_at is None or not is_open(task.status) or task.first_submitted_at is not None:
+    if (
+        task.due_at is None
+        or not is_open(task.status)
+        or task.status == TaskStatus.APPROVED  # approved work was delivered
+        or task.first_submitted_at is not None
+    ):
         return DeadlineState.NONE
     if task.due_at < now:
         return DeadlineState.OVERDUE
@@ -106,6 +112,7 @@ class NewTask:
     attachments: list[dict[str, Any]] = field(default_factory=list)
     series_id: int | None = None
     approval_chain: ApprovalChain = ApprovalChain.FINAL
+    estimated_minutes: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +170,9 @@ class TaskService:
             raise ValidationFailed("description_too_long")
         due_at = ensure_utc(data.due_at)
         chain = ApprovalChain(data.approval_chain)
+        estimate = data.estimated_minutes
+        if estimate is not None and not (0 < estimate <= ESTIMATE_MAX_MINUTES):
+            raise ValidationFailed("estimate_invalid")
 
         async with self._db.transaction() as session:
             fresh = await self._fresh_actor(session, actor)
@@ -184,6 +194,7 @@ class TaskService:
                 status=TaskStatus.TODO,
                 approval_chain=chain,
                 due_at=due_at,
+                estimated_minutes=estimate,
                 revision_round=0,
             )
             session.add(task)
@@ -215,6 +226,7 @@ class TaskService:
                     "due_at": due_at.isoformat(),
                     "series_id": data.series_id,
                     "approval_chain": str(chain),
+                    "estimated_minutes": estimate,
                     "brief_files": len(data.attachments),
                 },
             )

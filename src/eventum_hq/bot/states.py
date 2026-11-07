@@ -7,6 +7,7 @@ class NewTaskFlow(StatesGroup):
     title = State()
     description = State()
     assignee = State()
+    estimate = State()
     series = State()
     chain = State()
     confirm = State()

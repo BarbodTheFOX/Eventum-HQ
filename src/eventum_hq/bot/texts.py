@@ -138,7 +138,8 @@ STATUS_LABELS: dict[TaskStatus, str] = {
     TaskStatus.IN_PROGRESS: "🛠 در حال انجام",
     TaskStatus.IN_REVIEW: "👀 در بررسی",
     TaskStatus.CHANGES_REQUESTED: "✏️ نیاز به اصلاح",
-    TaskStatus.APPROVED: "✅ تأییدشده",
+    TaskStatus.APPROVED: "✅ تأییدشده — منتظر «انجام شد»",
+    TaskStatus.DONE: "🏁 انجام‌شده",
     TaskStatus.CANCELLED: "❌ لغوشده",
 }
 STATUS_EMOJI: dict[TaskStatus, str] = {s: label.split(" ", 1)[0] for s, label in STATUS_LABELS.items()}
@@ -148,7 +149,7 @@ AT_RISK_EMOJI = "🟠"
 CHAIN_LABELS: dict[ApprovalChain, str] = {
     ApprovalChain.FINAL: "فقط تأیید مدیر",
     ApprovalChain.L1_FINAL: "بررسی مرحلهٔ اول، سپس تأیید مدیر",
-    ApprovalChain.NONE: "بدون تأیید (با «انجام شد» تمام می‌شود)",
+    ApprovalChain.NONE: "بدون تأیید (مسئول با «✅ انجام شد» تمام می‌کند)",
 }
 
 WEEKDAYS = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"]  # Saturday = 0
@@ -181,6 +182,7 @@ TASK_CARD = (
     "ددلاین: {due}\n"
     "سری: {series}\n"
     "زنجیرهٔ تأیید: {chain}\n"
+    "زمان تخمینی: {estimate}\n"
     "دور اصلاح: {rounds}\n"
     "سازنده: {creator}"
 )
@@ -264,6 +266,17 @@ QUICK_DATE_LABELS = {
     "after": "پس‌فردا",
     "sat": "شنبهٔ آینده",
 }
+NEW_TASK_ESTIMATE = (
+    "⏱ زمان تخمینی این کار چقدر است؟ (اختیاری، ولی کمک می‌کند بار کاری دیده شود)\n"
+    "یکی از دکمه‌ها را بزنید یا بنویسید، مثلاً <code>90</code> (دقیقه) یا <code>۱۴ ساعت</code>."
+)
+ESTIMATE_CHOICES = (15, 30, 60, 120, 240)
+BTN_NO_ESTIMATE = "⏭ بدون تخمین"
+INVALID_ESTIMATE = "زمان نامعتبر است. نمونه: <code>90</code> یا <code>۱٫۵ ساعت</code> یا <code>1.5h</code>"
+NO_ESTIMATE = "—"
+DURATION_MINUTES = "{m} دقیقه"
+DURATION_HOURS = "{h} ساعت"
+DURATION_HOURS_MINUTES = "{h} ساعت و {m} دقیقه"
 NEW_TASK_SERIES = "🗂 سری این تسک؟ (اختیاری)"
 BTN_NO_SERIES = "بدون سری"
 NEW_TASK_CHAIN = "✅ زنجیرهٔ تأیید؟\nپیش‌فرض: <b>فقط تأیید مدیر</b>."
@@ -274,6 +287,7 @@ NEW_TASK_CONFIRM = (
     "ددلاین: {due}\n"
     "سری: {series}\n"
     "زنجیرهٔ تأیید: {chain}\n"
+    "زمان تخمینی: {estimate}\n"
     "توضیح: {description}"
 )
 NEW_TASK_BRIEF_FILE = "📎 یک فایل"
@@ -297,6 +311,7 @@ VALIDATION_MESSAGES: dict[str, str] = {
     "series_invalid": "این سری معتبر نیست.",
     "same_due": "ددلاین جدید با قبلی یکی است.",
     "same_assignee": "همین نفر الان مسئول است.",
+    "estimate_invalid": "زمان تخمینی نامعتبر است.",
 }
 
 # ---- tasks: notifications ------------------------------------------------------

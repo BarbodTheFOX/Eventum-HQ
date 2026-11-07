@@ -421,3 +421,15 @@ async def test_deactivated_actor_is_refused(db: Database, tasks: TaskService, te
         farid.is_active = False
     with pytest.raises(PermissionDenied):
         await tasks.create_generic(team["farid"], _new(team["sina"], clock))
+
+
+async def test_estimate_is_stored_and_validated(db: Database, tasks: TaskService, team, clock) -> None:
+    task = await tasks.create_generic(team["farid"], _new(team["sina"], clock, estimated_minutes=90))
+    assert task.estimated_minutes == 90
+    event = [e for e in await _all(db, AuditEvent) if e.action == "task.created"][0]
+    assert event.data["estimated_minutes"] == 90
+    no_estimate = await tasks.create_generic(team["farid"], _new(team["sina"], clock))
+    assert no_estimate.estimated_minutes is None
+    for bad in (0, -1, 200 * 60 + 1):
+        with pytest.raises(ValidationFailed, match="estimate_invalid"):
+            await tasks.create_generic(team["farid"], _new(team["sina"], clock, estimated_minutes=bad))

@@ -84,6 +84,18 @@ def humanize_delta(due: datetime, now: datetime) -> str:
     return template.format(n=fa_digits(n), unit=unit)
 
 
+def format_minutes(minutes: int | None) -> str:
+    """90 → '۱ ساعت و ۳۰ دقیقه'; None → '—'."""
+    if not minutes:
+        return texts.NO_ESTIMATE
+    hours, rest = divmod(int(minutes), 60)
+    if hours == 0:
+        return fa_digits(texts.DURATION_MINUTES.format(m=rest))
+    if rest == 0:
+        return fa_digits(texts.DURATION_HOURS.format(h=hours))
+    return fa_digits(texts.DURATION_HOURS_MINUTES.format(h=hours, m=rest))
+
+
 def user_label(user: User | None, *, with_role: bool = False, html: bool = True) -> str:
     """Display name. ``html=False`` for button labels (buttons show text literally)."""
     if user is None:
@@ -132,6 +144,7 @@ def task_card(view: TaskView, now: datetime) -> str:
         due=format_due(t, now),
         series=esc(view.series.name) if view.series else texts.NO_SERIES,
         chain=texts.CHAIN_LABELS[t.approval_chain],
+        estimate=format_minutes(t.estimated_minutes),
         rounds=fa_digits(t.revision_round),
         creator=user_label(view.creator),
     )

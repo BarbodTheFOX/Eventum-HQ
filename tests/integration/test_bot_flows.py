@@ -146,6 +146,10 @@ async def _create_task_via_bot(h: Harness, title: str = "تامنیل اپیزو
     await h.press(FARID, f"nt:assignee:{sina_id}")
     assert h.last_text(FARID) == texts.DUE_DATE_PROMPT
     await h.text(FARID, "۱۴۰۵/۸/۲۰ ۱۸:۳۰")  # date + time in one go (Persian digits)
+    assert h.last_text(FARID) == texts.NEW_TASK_ESTIMATE
+    await h.text(FARID, "چند")  # invalid estimate
+    assert h.last_text(FARID) == texts.INVALID_ESTIMATE
+    await h.text(FARID, "۱٫۵ ساعت")
     assert h.last_text(FARID) == texts.NEW_TASK_SERIES
     await h.press(FARID, "nt:series:0")
     assert h.last_text(FARID) == texts.NEW_TASK_CHAIN
@@ -159,10 +163,12 @@ async def test_farid_creates_task_and_sina_gets_card(h: Harness) -> None:
     task = await _create_task_via_bot(h)
     assert task.code == "T-0001" and task.title == "تامنیل اپیزود ۱۲"
     assert task.due_at == datetime(2026, 11, 11, 15, 0, tzinfo=UTC)  # 18:30 Tehran
+    assert task.estimated_minutes == 90
     assert any("T-0001" in t for t in h.texts_to(FARID))
     to_sina = h.texts_to(SINA)
     assert len(to_sina) == 1 and to_sina[0].startswith(texts.NOTIFY_TASK_ASSIGNED.strip()[:5])
     assert "تامنیل اپیزود ۱۲" in to_sina[0] and "۱۴۰۵/۰۸/۲۰ ساعت ۱۸:۳۰" in to_sina[0]
+    assert "۱ ساعت و ۳۰ دقیقه" in to_sina[0]
 
 
 async def test_sina_lists_opens_and_starts(h: Harness) -> None:
@@ -308,11 +314,13 @@ async def test_voice_brief_is_kept_and_resent(h: Harness) -> None:
     assert h.last_text(FARID) == texts.NEW_TASK_ASSIGNEE
     await h.press(FARID, f"nt:assignee:{sina_id}")
     await h.text(FARID, "8/20 10:00")
+    await h.press(FARID, "nt:estimate:0")  # no estimate
     await h.press(FARID, "nt:series:0")
     await h.press(FARID, "nt:chain:FINAL")
     await h.press(FARID, "nt:create:")
     task = (await _tasks(h.db))[-1]
     assert task.description == "توضیح صوتی"
+    assert task.estimated_minutes is None
     h.clear()
     await h.press(SINA, f"t:b:{task.id}:0")
     voices = [c for c in h.session.calls if isinstance(c, SendVoice)]

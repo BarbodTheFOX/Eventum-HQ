@@ -53,7 +53,8 @@ class TaskStatus(StrEnum):
     IN_PROGRESS = "IN_PROGRESS"
     IN_REVIEW = "IN_REVIEW"
     CHANGES_REQUESTED = "CHANGES_REQUESTED"
-    APPROVED = "APPROVED"
+    APPROVED = "APPROVED"  # generic task with approval: approved, waiting for "done"
+    DONE = "DONE"
     CANCELLED = "CANCELLED"
 
 

@@ -14,13 +14,15 @@ EXPECTED_ALLOWED = {
     (S.BLOCKED, S.TODO),
     (S.TODO, S.IN_PROGRESS),
     (S.TODO, S.IN_REVIEW),
-    (S.TODO, S.APPROVED),  # chain NONE
+    (S.TODO, S.DONE),  # chain NONE
     (S.IN_PROGRESS, S.IN_REVIEW),
-    (S.IN_PROGRESS, S.APPROVED),  # chain NONE
+    (S.IN_PROGRESS, S.DONE),  # chain NONE
     (S.IN_REVIEW, S.CHANGES_REQUESTED),
-    (S.IN_REVIEW, S.APPROVED),
+    (S.IN_REVIEW, S.APPROVED),  # generic: approved, waiting for "done"
+    (S.IN_REVIEW, S.DONE),  # reel tasks: approval finishes them
     (S.CHANGES_REQUESTED, S.IN_PROGRESS),
     (S.CHANGES_REQUESTED, S.IN_REVIEW),
+    (S.APPROVED, S.DONE),  # "🏁 done" after upload
 } | {(s, S.CANCELLED) for s in OPEN}
 
 ALL_PAIRS = [(a, b) for a in TaskStatus for b in TaskStatus]
@@ -38,6 +40,7 @@ def test_transition_matrix(current: TaskStatus, target: TaskStatus) -> None:
 
 
 def test_terminal_states() -> None:
-    assert TERMINAL == {S.APPROVED, S.CANCELLED}
+    assert TERMINAL == {S.DONE, S.CANCELLED}
+    assert S.APPROVED in OPEN  # waits for "done"
     for status in TERMINAL:
         assert not any(can_transition(status, t) for t in TaskStatus)

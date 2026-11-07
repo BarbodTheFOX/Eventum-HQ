@@ -9,7 +9,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from eventum_hq.bot import texts
-from eventum_hq.bot.formatters import fa_digits, task_button_label, user_label
+from eventum_hq.bot.formatters import fa_digits, format_minutes, task_button_label, user_label
 from eventum_hq.core.jalali import QuickDate
 from eventum_hq.models import ApprovalChain, Series, User
 from eventum_hq.services.tasks import TaskFilter, TaskRow, TaskView
@@ -60,6 +60,7 @@ class ListCb(CallbackData, prefix="tl"):
 class NewTaskStep(StrEnum):
     SKIP_DESCRIPTION = "skip"
     ASSIGNEE = "assignee"
+    ESTIMATE = "estimate"  # value = minutes, "0" = no estimate
     SERIES = "series"
     CHAIN = "chain"
     CREATE = "create"
@@ -236,6 +237,17 @@ def new_task_assignee_keyboard(users: list[User]) -> InlineKeyboardMarkup:
         [_btn(user_label(u, with_role=True, html=False), NewTaskCb(step=NewTaskStep.ASSIGNEE, value=str(u.id))) for u in users],
         1,
     )
+    rows.append(_abort_row())
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def new_task_estimate_keyboard() -> InlineKeyboardMarkup:
+    buttons = [
+        _btn(format_minutes(m), NewTaskCb(step=NewTaskStep.ESTIMATE, value=str(m)))
+        for m in texts.ESTIMATE_CHOICES
+    ]
+    rows = _rows(buttons, 3)
+    rows.append([_btn(texts.BTN_NO_ESTIMATE, NewTaskCb(step=NewTaskStep.ESTIMATE, value="0"))])
     rows.append(_abort_row())
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

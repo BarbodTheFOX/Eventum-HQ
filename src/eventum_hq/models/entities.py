@@ -53,6 +53,8 @@ class User(IdMixin, TimestampMixin, Base):
     access_status: Mapped[AccessStatus] = mapped_column(
         enum_column(AccessStatus), nullable=False, default=AccessStatus.PENDING
     )
+    # for the "over capacity" warning in reports (F17); empty = no warning
+    weekly_capacity_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     @property
     def can_use_bot(self) -> bool:
@@ -147,6 +149,7 @@ class Task(IdMixin, TimestampMixin, Base):
     )
     blocked_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     due_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    estimated_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)  # F17
     first_submitted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     revision_round: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

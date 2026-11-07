@@ -1,8 +1,8 @@
 """➕ New task flow (handoff §4.6, §5.3) and the shared deadline picker.
 
 title → description (optional: text/voice/photo/video/file) → assignee →
-deadline (quick buttons or Jalali text, then time) → series → approval chain →
-confirm. /cancel works at every step; flows expire after 30 minutes idle.
+deadline (quick buttons or Jalali text, then time) → estimated time (optional,
+F17) → series → approval chain → confirm. /cancel works at every step; flows expire after 30 minutes idle.
 """
 
 from __future__ import annotations
@@ -15,7 +15,13 @@ from aiogram.types import CallbackQuery, Message
 
 from eventum_hq.bot import texts
 from eventum_hq.bot.attachments import extract_attachment
-from eventum_hq.bot.formatters import esc, format_jalali_date, format_jalali_datetime, user_label
+from eventum_hq.bot.formatters import (
+    esc,
+    format_jalali_date,
+    format_jalali_datetime,
+    format_minutes,
+    user_label,
+)
 from eventum_hq.bot.keyboards.main_menu import AdminViews, menu_for
 from eventum_hq.bot.keyboards.tasks import (
     DateCb,
@@ -25,6 +31,7 @@ from eventum_hq.bot.keyboards.tasks import (
     new_task_assignee_keyboard,
     new_task_chain_keyboard,
     new_task_confirm_keyboard,
+    new_task_estimate_keyboard,
     new_task_series_keyboard,
     past_confirm_keyboard,
     quick_date_keyboard,
@@ -41,8 +48,10 @@ from eventum_hq.core.errors import (
 )
 from eventum_hq.core.jalali import (
     InvalidDateInput,
+    InvalidEstimateInput,
     InvalidTimeInput,
     parse_date_input,
+    parse_estimate_input,
     parse_time_input,
     quick_date,
     tehran_to_utc,
@@ -274,6 +283,36 @@ async def _date_done(
         return
 
     await state.update_data(due_at=due.isoformat())
+    await state.set_state(NewTaskFlow.estimate)
+    await reply(event, texts.NEW_TASK_ESTIMATE, new_task_estimate_keyboard())
+
+
+# ---- estimate (F17) ----------------------------------------------------------------
+
+
+@router.callback_query(NewTaskFlow.estimate, NewTaskCb.filter(F.step == NewTaskStep.ESTIMATE))
+async def on_estimate_button(
+    query: CallbackQuery, callback_data: NewTaskCb, state: FSMContext, tasks: TaskService
+) -> None:
+    minutes = int(callback_data.value) if callback_data.value.isdigit() else 0
+    await _ask_series(query, state, tasks, minutes or None)
+    await query.answer()
+
+
+@router.message(NewTaskFlow.estimate, FREE_TEXT)
+async def on_estimate_text(message: Message, state: FSMContext, tasks: TaskService) -> None:
+    try:
+        minutes = parse_estimate_input(message.text or "")
+    except InvalidEstimateInput:
+        await message.answer(texts.INVALID_ESTIMATE)
+        return
+    await _ask_series(message, state, tasks, minutes)
+
+
+async def _ask_series(
+    event: Message | CallbackQuery, state: FSMContext, tasks: TaskService, minutes: int | None
+) -> None:
+    await state.update_data(estimated_minutes=minutes)
     await state.set_state(NewTaskFlow.series)
     await reply(event, texts.NEW_TASK_SERIES, new_task_series_keyboard(await tasks.active_series()))
 
@@ -320,6 +359,7 @@ async def _summary(state: FSMContext, tasks: TaskService) -> str:
         due=format_jalali_datetime(datetime.fromisoformat(data["due_at"])),
         series=esc(series_obj.name) if series_obj else texts.NO_SERIES,
         chain=texts.CHAIN_LABELS[ApprovalChain(data["approval_chain"])],
+        estimate=format_minutes(data.get("estimated_minutes")),
         description=description,
     )
 
@@ -338,6 +378,7 @@ async def on_create(
         attachments=list(data.get("attachments") or []),
         series_id=data.get("series_id"),
         approval_chain=ApprovalChain(data["approval_chain"]),
+        estimated_minutes=data.get("estimated_minutes"),
     )
     try:
         task = await tasks.create_generic(current_user, new)
