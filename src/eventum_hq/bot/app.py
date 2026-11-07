@@ -10,6 +10,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats
 
 from eventum_hq.bot import texts
+from eventum_hq.bot.keyboards.main_menu import AdminViews
 from eventum_hq.bot.middlewares import AccessMiddleware, OutboxFlushMiddleware
 from eventum_hq.bot.outbox import OutboxSender
 from eventum_hq.bot.routers import build_root_router
@@ -34,6 +35,7 @@ def build_dispatcher(
         # injected into handlers by parameter name
         users=users,
         outbox=outbox,
+        admin_views=AdminViews(),
         team_group_id=settings.team_group_id,
     )
     # Outer middlewares run in registration order: flush wraps the access gate.

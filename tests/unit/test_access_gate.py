@@ -12,6 +12,7 @@ from aiogram.types import User as TgUser
 from eventum_hq.bot.middlewares import (
     AccessMiddleware,
     is_allowed,
+    is_join_callback,
     is_start_command,
     should_leave_chat,
 )
@@ -39,7 +40,7 @@ def test_is_start_command(text: str | None, expected: bool) -> None:
 
 
 @pytest.mark.parametrize(
-    ("chat_type", "known", "start", "allowed"),
+    ("chat_type", "known", "entry", "allowed"),
     [
         ("private", True, False, True),
         ("private", True, True, True),
@@ -52,8 +53,8 @@ def test_is_start_command(text: str | None, expected: bool) -> None:
         (None, True, False, False),
     ],
 )
-def test_is_allowed(chat_type: str | None, known: bool, start: bool, allowed: bool) -> None:
-    assert is_allowed(chat_type=chat_type, is_known_user=known, is_start=start) is allowed
+def test_is_allowed(chat_type: str | None, known: bool, entry: bool, allowed: bool) -> None:
+    assert is_allowed(chat_type=chat_type, is_known_user=known, is_entry=entry) is allowed
 
 
 @pytest.mark.parametrize(
@@ -127,7 +128,7 @@ async def test_known_user_in_group_is_ignored(users: UserService, owner) -> None
 async def test_inactive_or_unapproved_user_is_blocked(
     db, users: UserService, is_active: bool, status: AccessStatus
 ) -> None:
-    await add_user(db, telegram_id=777, role=Role.MEMBER, is_active=is_active, access_status=status)
+    await add_user(db, telegram_id=777, role=Role.EDITOR, is_active=is_active, access_status=status)
     mw, handler = AccessMiddleware(users), Recorder()
     update, data = _message_update(777, "/menu")
     assert await mw(handler, update, data) is None
@@ -153,3 +154,24 @@ async def test_unknown_user_callback_is_dropped(users: UserService, owner, monke
     assert result is None
     assert handler.calls == []
     assert answered == [True]
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [("join:EDITOR", True), ("join:", True), ("acc:ok:1", False), ("joiner", False), (None, False)],
+)
+def test_is_join_callback(data: str | None, expected: bool) -> None:
+    assert is_join_callback(data) is expected
+
+
+async def test_unknown_user_role_picker_callback_passes(users: UserService, owner) -> None:
+    tg_user = TgUser(id=STRANGER_TG, is_bot=False, first_name="X")
+    chat = Chat(id=STRANGER_TG, type="private")
+    msg = Message(message_id=1, date=datetime.now(UTC), chat=chat, from_user=tg_user, text="x")
+    cq = CallbackQuery(id="1", from_user=tg_user, chat_instance="c", message=msg, data="join:EDITOR")
+    handler = Recorder()
+    result = await AccessMiddleware(users)(
+        handler, Update(update_id=3, callback_query=cq), {"event_chat": chat, "event_from_user": tg_user}
+    )
+    assert result == "handled"
+    assert handler.calls[-1]["current_user"] is None

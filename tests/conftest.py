@@ -53,7 +53,7 @@ async def add_user(
     db: Database,
     *,
     telegram_id: int,
-    role: Role = Role.MEMBER,
+    role: Role = Role.EDITOR,
     capabilities: list[Capability] | None = None,
     is_active: bool = True,
     access_status: AccessStatus = AccessStatus.APPROVED,
@@ -74,7 +74,7 @@ async def add_user(
 
 def make_user(
     *,
-    role: Role = Role.MEMBER,
+    role: Role = Role.EDITOR,
     capabilities: list[Capability] | None = None,
     is_active: bool = True,
     access_status: AccessStatus = AccessStatus.APPROVED,

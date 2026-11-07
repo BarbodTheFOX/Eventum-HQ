@@ -4,9 +4,14 @@ from enum import StrEnum
 
 
 class Role(StrEnum):
-    OWNER = "OWNER"
-    MANAGER = "MANAGER"
-    MEMBER = "MEMBER"
+    """Team roles (handoff v1.1 §3.1)."""
+
+    OWNER = "OWNER"  # Barbod — developer, full access
+    DIRECTOR = "DIRECTOR"  # Farid — founder, all final approvals
+    PROJECT_MANAGER = "PROJECT_MANAGER"  # Ali
+    CONTENT_SPECIALIST = "CONTENT_SPECIALIST"  # Amin
+    DESIGNER = "DESIGNER"  # Mohadeseh
+    EDITOR = "EDITOR"  # Sina
 
 
 class AccessStatus(StrEnum):

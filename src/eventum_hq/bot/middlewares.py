@@ -18,6 +18,7 @@ from typing import Any
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Update
 
+from eventum_hq.bot.keyboards.access import JOIN_PREFIX
 from eventum_hq.bot.outbox import OutboxSender
 from eventum_hq.services.users import UserService
 
@@ -32,11 +33,16 @@ def is_start_command(text: str | None) -> bool:
     return bool(text) and _START_RE.match(text.strip()) is not None  # type: ignore[union-attr]
 
 
-def is_allowed(*, chat_type: str | None, is_known_user: bool, is_start: bool) -> bool:
-    """Pure gate decision (unit-tested)."""
+def is_join_callback(data: str | None) -> bool:
+    """The role-picker buttons an unknown user presses to ask for access."""
+    return bool(data) and data.startswith(f"{JOIN_PREFIX}:")  # type: ignore[union-attr]
+
+
+def is_allowed(*, chat_type: str | None, is_known_user: bool, is_entry: bool) -> bool:
+    """Pure gate decision (unit-tested). ``is_entry`` = /start or a role-picker button."""
     if chat_type != "private":
         return False
-    return is_known_user or is_start
+    return is_known_user or is_entry
 
 
 def should_leave_chat(*, chat_type: str, chat_id: int, team_group_id: int | None) -> bool:
@@ -65,10 +71,11 @@ class AccessMiddleware(BaseMiddleware):
             current_user = await self._users.get_active_by_telegram_id(tg_user.id)
 
         text = event.message.text if event.message is not None else None
+        cb_data = event.callback_query.data if event.callback_query is not None else None
         if not is_allowed(
             chat_type=chat.type,
             is_known_user=current_user is not None,
-            is_start=is_start_command(text),
+            is_entry=is_start_command(text) or is_join_callback(cb_data),
         ):
             if event.callback_query is not None and chat.type == "private":
                 await event.callback_query.answer()  # stop the spinner, say nothing

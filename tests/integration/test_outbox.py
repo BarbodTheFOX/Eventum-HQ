@@ -9,7 +9,10 @@ from aiogram.methods import SendMessage
 from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from sqlalchemy import select
 
+from eventum_hq.bot import texts
 from eventum_hq.bot.keyboards.access import AccessAction, AccessCb
+from eventum_hq.models import Role
+from eventum_hq.services.permissions import MenuItem
 from eventum_hq.bot.outbox import OutboxSender
 from eventum_hq.core.db import Database
 from eventum_hq.models import Notification, NotificationStatus
@@ -42,27 +45,36 @@ async def test_full_access_flow_delivers_card_then_approval(
     sender = FakeSender()
     outbox = OutboxSender(sender, OutboxStore(db, clock), users)
 
-    req = await users.start(telegram_id=STRANGER_TG, full_name="Sina <b>", username="sina")
+    req = await users.request_access(
+        telegram_id=STRANGER_TG, full_name="Sina <b>", username="sina", role="CONTENT_SPECIALIST"
+    )
     assert await outbox.flush_urgent() == 1
     chat_id, text, markup = sender.sent[0]
     assert chat_id == OWNER_TG
     assert "Sina &lt;b&gt;" in text  # user input is HTML-escaped
     assert "@sina" in text and str(STRANGER_TG) in text
+    assert texts.ROLE_LABELS[Role.CONTENT_SPECIALIST] in text
     assert isinstance(markup, InlineKeyboardMarkup)
-    buttons = markup.inline_keyboard[0]
-    assert AccessCb.unpack(buttons[0].callback_data) == AccessCb(
+    first_row, second_row = markup.inline_keyboard
+    assert texts.ROLE_LABELS[Role.CONTENT_SPECIALIST] in first_row[0].text
+    assert AccessCb.unpack(first_row[0].callback_data) == AccessCb(
         action=AccessAction.APPROVE, user_id=req.user.id
     )
-    assert AccessCb.unpack(buttons[1].callback_data).action == AccessAction.REJECT
+    assert AccessCb.unpack(second_row[0].callback_data).action == AccessAction.PICK_ROLE
+    assert AccessCb.unpack(second_row[1].callback_data).action == AccessAction.REJECT
 
     # nothing is sent twice
     assert await outbox.flush_urgent() == 0
 
     await users.approve_access(owner, req.user.id)
     assert await outbox.flush_urgent() == 1
-    chat_id, _text, markup = sender.sent[1]
+    chat_id, text, markup = sender.sent[1]
     assert chat_id == STRANGER_TG
-    assert isinstance(markup, ReplyKeyboardMarkup)  # the approved user's menu
+    assert texts.ROLE_LABELS[Role.CONTENT_SPECIALIST] in text
+    assert isinstance(markup, ReplyKeyboardMarkup)  # the approved user's own menu
+    labels = [b.text for row in markup.keyboard for b in row]
+    assert texts.MENU_LABELS[MenuItem.NEW_REEL] in labels
+    assert texts.MENU_LABELS[MenuItem.TEAM] not in labels
     assert all(r.status == NotificationStatus.SENT and r.sent_at for r in await _rows(db))
 
 

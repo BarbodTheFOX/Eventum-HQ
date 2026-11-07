@@ -22,7 +22,8 @@ class User(IdMixin, TimestampMixin, Base):
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     full_name: Mapped[str] = mapped_column(Text, nullable=False, default="")
     username: Mapped[str | None] = mapped_column(Text, nullable=True)
-    role: Mapped[Role] = mapped_column(enum_column(Role), nullable=False, default=Role.MEMBER)
+    # While access_status is PENDING this is the role the user asked for.
+    role: Mapped[Role] = mapped_column(enum_column(Role), nullable=False)
     capabilities: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     deactivated_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)

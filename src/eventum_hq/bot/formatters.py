@@ -5,6 +5,7 @@ from __future__ import annotations
 from html import escape
 
 from eventum_hq.bot import texts
+from eventum_hq.models import Role
 
 
 def esc(value: object) -> str:
@@ -20,9 +21,19 @@ def display_username(username: str | None) -> str:
     return f"@{esc(username)}" if username else texts.NO_USERNAME
 
 
-def access_request_card(*, full_name: str | None, username: str | None, telegram_id: int) -> str:
+def role_label(role: Role | str | None) -> str:
+    try:
+        return texts.ROLE_LABELS[Role(role)] if role is not None else "—"
+    except ValueError:
+        return esc(role)
+
+
+def access_request_card(
+    *, full_name: str | None, username: str | None, telegram_id: int, role: Role | str | None
+) -> str:
     return texts.ACCESS_REQUEST_CARD.format(
         name=display_name(full_name),
         username=display_username(username),
         telegram_id=int(telegram_id),
+        role=role_label(role),
     )

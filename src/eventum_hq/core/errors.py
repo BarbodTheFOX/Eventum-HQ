@@ -19,6 +19,10 @@ class NotFound(DomainError):
     """The requested entity does not exist."""
 
 
+class InvalidRole(DomainError):
+    """A role that may not be requested or assigned here (e.g. OWNER)."""
+
+
 class AlreadyDecided(DomainError):
     """The item was already handled (e.g. an access request decided earlier)."""
 

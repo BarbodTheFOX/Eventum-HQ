@@ -18,7 +18,7 @@ from aiogram.exceptions import (
 from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 from eventum_hq.bot import texts
-from eventum_hq.bot.formatters import access_request_card
+from eventum_hq.bot.formatters import access_request_card, role_label
 from eventum_hq.bot.keyboards.access import access_request_keyboard
 from eventum_hq.bot.keyboards.main_menu import main_menu
 from eventum_hq.models import Notification
@@ -42,16 +42,19 @@ class UnknownNotificationKind(Exception):
 async def render(row: Notification, users: UserService) -> tuple[str, Markup]:
     payload = row.payload or {}
     if row.kind == user_kinds.KIND_ACCESS_REQUEST:
+        requested_role = payload["requested_role"]
         text = access_request_card(
             full_name=payload.get("full_name"),
             username=payload.get("username"),
             telegram_id=int(payload["telegram_id"]),
+            role=requested_role,
         )
-        return text, access_request_keyboard(int(payload["user_id"]))
+        return text, access_request_keyboard(int(payload["user_id"]), requested_role)
     if row.kind == user_kinds.KIND_ACCESS_APPROVED:
         user = await users.get(int(payload["user_id"]))
-        markup: Markup = main_menu(user) if user is not None and user.can_use_bot else None
-        return texts.ACCESS_APPROVED_FOR_USER, markup
+        if user is None or not user.can_use_bot:
+            raise UnknownNotificationKind("approved user is no longer active")
+        return texts.ACCESS_APPROVED_FOR_USER.format(role=role_label(user.role)), main_menu(user)
     if row.kind == user_kinds.KIND_ACCESS_REJECTED:
         return texts.ACCESS_REJECTED_FOR_USER, ReplyKeyboardRemove()
     raise UnknownNotificationKind(row.kind)

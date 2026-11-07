@@ -76,3 +76,34 @@ def test_models_match_migrations(tmp_path: Path) -> None:
         return result
 
     assert asyncio.run(diff()) == []
+
+
+def test_0002_remaps_old_roles(tmp_path: Path) -> None:
+    db_file = tmp_path / "eventum.db"
+    url = _url(db_file)
+    command.upgrade(alembic_config(url), "0001")
+    con = sqlite3.connect(db_file)
+    now = "2026-11-07 00:00:00.000000"
+    rows = [
+        (1, "OWNER", "[]"),
+        (2, "MANAGER", '["CREATE_TASK"]'),
+        (3, "MEMBER", '["PUBLISH"]'),
+    ]
+    con.executemany(
+        "INSERT INTO users (telegram_id, full_name, role, capabilities, is_active, "
+        "access_status, created_at, updated_at) VALUES (?, 'x', ?, ?, 1, 'APPROVED', ?, ?)",
+        [(tg, role, caps, now, now) for tg, role, caps in rows],
+    )
+    con.commit()
+    con.close()
+
+    upgrade_to_head(url)
+    con = sqlite3.connect(db_file)
+    try:
+        got = dict(con.execute("SELECT telegram_id, role FROM users"))
+        assert got == {1: "OWNER", 2: "PROJECT_MANAGER", 3: "EDITOR"}
+        caps = dict(con.execute("SELECT telegram_id, capabilities FROM users"))
+        assert caps[1] == '["PUBLISH", "SYSTEM_ADMIN"]'
+        assert caps[2] == '["CREATE_TASK"]'  # untouched
+    finally:
+        con.close()
