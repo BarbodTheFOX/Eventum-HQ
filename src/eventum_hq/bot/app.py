@@ -11,10 +11,16 @@ from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats
 
 from eventum_hq.bot import texts
 from eventum_hq.bot.keyboards.main_menu import AdminViews
-from eventum_hq.bot.middlewares import AccessMiddleware, OutboxFlushMiddleware
+from eventum_hq.bot.middlewares import (
+    AccessMiddleware,
+    FlowTimeoutMiddleware,
+    OutboxFlushMiddleware,
+)
 from eventum_hq.bot.outbox import OutboxSender
 from eventum_hq.bot.routers import build_root_router
 from eventum_hq.core.config import Settings
+from eventum_hq.core.timeutil import Clock
+from eventum_hq.services.tasks import TaskService
 from eventum_hq.services.users import UserService
 
 
@@ -28,19 +34,29 @@ def build_bot(settings: Settings) -> Bot:
 
 
 def build_dispatcher(
-    *, settings: Settings, users: UserService, outbox: OutboxSender
+    *,
+    settings: Settings,
+    users: UserService,
+    tasks: TaskService,
+    outbox: OutboxSender,
+    clock: Clock,
 ) -> Dispatcher:
     dp = Dispatcher(
         storage=MemoryStorage(),
         # injected into handlers by parameter name
         users=users,
+        tasks=tasks,
         outbox=outbox,
+        clock=clock,
         admin_views=AdminViews(),
         team_group_id=settings.team_group_id,
     )
     # Outer middlewares run in registration order: flush wraps the access gate.
     dp.update.outer_middleware(OutboxFlushMiddleware(outbox))
     dp.update.outer_middleware(AccessMiddleware(users))
+    timeout = FlowTimeoutMiddleware(clock)
+    dp.message.outer_middleware(timeout)
+    dp.callback_query.outer_middleware(timeout)
     dp.include_router(build_root_router())
     return dp
 

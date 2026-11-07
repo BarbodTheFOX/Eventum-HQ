@@ -8,7 +8,7 @@ from __future__ import annotations
 from enum import StrEnum
 
 from eventum_hq.core.errors import PermissionDenied
-from eventum_hq.models import Capability, Role, User
+from eventum_hq.models import Capability, Role, Task, User
 
 ALL_CAPABILITIES: frozenset[Capability] = frozenset(Capability)
 
@@ -84,6 +84,27 @@ def require_capability(user: User, capability: Capability) -> None:
 
 def is_owner(user: User) -> bool:
     return user.can_use_bot and user.role == Role.OWNER
+
+
+# ---- tasks (handoff §3.2) ----------------------------------------------------
+
+
+def can_view_task(user: User, task: Task) -> bool:
+    """Assignee, creator, or anyone with VIEW_ALL_TASKS."""
+    if not user.can_use_bot:
+        return False
+    return (
+        task.assignee_id == user.id
+        or task.created_by == user.id
+        or has_capability(user, C.VIEW_ALL_TASKS)
+    )
+
+
+def can_manage_task(user: User, task: Task) -> bool:
+    """Edit deadline / reassign / cancel: CREATE_TASK holders or the task's creator."""
+    if not user.can_use_bot:
+        return False
+    return has_capability(user, C.CREATE_TASK) or task.created_by == user.id
 
 
 class MenuItem(StrEnum):

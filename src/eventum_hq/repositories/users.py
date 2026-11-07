@@ -30,3 +30,20 @@ async def list_active_owners(session: AsyncSession) -> Sequence[User]:
         .order_by(User.id)
     )
     return result.scalars().all()
+
+
+async def list_active(session: AsyncSession) -> Sequence[User]:
+    """Approved, active users — the people a task can be assigned to."""
+    result = await session.execute(
+        select(User)
+        .where(User.is_active.is_(True), User.access_status == AccessStatus.APPROVED)
+        .order_by(User.full_name, User.id)
+    )
+    return result.scalars().all()
+
+
+async def get_many(session: AsyncSession, ids: set[int]) -> dict[int, User]:
+    if not ids:
+        return {}
+    result = await session.execute(select(User).where(User.id.in_(ids)))
+    return {u.id: u for u in result.scalars()}

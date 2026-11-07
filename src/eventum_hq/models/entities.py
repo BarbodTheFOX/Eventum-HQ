@@ -9,11 +9,34 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Index, Integer, String, Text
+from datetime import date
+
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    Date,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from eventum_hq.models.base import Base, IdMixin, TimestampMixin, UTCDateTime, enum_column
-from eventum_hq.models.enums import AccessStatus, NotificationStatus, Role, SeriesKind
+from eventum_hq.models.enums import (
+    AccessStatus,
+    ApprovalChain,
+    NotificationStatus,
+    ReviewStage,
+    Role,
+    SeriesKind,
+    TaskInputKind,
+    TaskKind,
+    TaskStatus,
+)
 
 
 class User(IdMixin, TimestampMixin, Base):
@@ -87,3 +110,67 @@ class AuditEvent(IdMixin, TimestampMixin, Base):
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
     data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class Task(IdMixin, TimestampMixin, Base):
+    """One unit of work with one assignee (handoff §4.1, §7).
+
+    ``content_item_id`` and ``recurrence_id`` get their foreign keys in M3 / M5,
+    when ``content_items`` and ``recurrences`` exist.
+    """
+
+    __tablename__ = "tasks"
+    __table_args__ = (
+        Index(None, "assignee_id", "status"),
+        Index(None, "status", "due_at"),
+        UniqueConstraint("recurrence_id", "recurrence_date"),
+    )
+
+    code: Mapped[str] = mapped_column(String(16), unique=True, nullable=False)  # T-0001
+    content_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    kind: Mapped[TaskKind] = mapped_column(enum_column(TaskKind), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    series_id: Mapped[int | None] = mapped_column(
+        ForeignKey("series.id", ondelete="RESTRICT"), nullable=True
+    )
+    assignee_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_by: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    status: Mapped[TaskStatus] = mapped_column(enum_column(TaskStatus), nullable=False)
+    review_stage: Mapped[ReviewStage | None] = mapped_column(enum_column(ReviewStage), nullable=True)
+    approval_chain: Mapped[ApprovalChain] = mapped_column(
+        enum_column(ApprovalChain), nullable=False
+    )
+    blocked_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    due_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    first_submitted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    revision_round: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    recurrence_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recurrence_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    external_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    external_synced_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class TaskInput(IdMixin, TimestampMixin, Base):
+    """Input needed to do a task: timecodes, cover text/photos, or a brief."""
+
+    __tablename__ = "task_inputs"
+
+    task_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    content_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    kind: Mapped[TaskInputKind] = mapped_column(enum_column(TaskInputKind), nullable=False)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # [{file_id, file_unique_id, type, archive_message_id, size}]
+    attachments: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    provided_by: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    provided_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)

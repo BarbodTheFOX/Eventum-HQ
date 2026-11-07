@@ -22,7 +22,9 @@ from eventum_hq.core.errors import ConfigError
 from eventum_hq.core.logging import setup_logging
 from eventum_hq.core.migrate import upgrade_to_head
 from eventum_hq.core.timeutil import SystemClock
+from eventum_hq.integrations.sync import NoopSync
 from eventum_hq.services.notifications import OutboxStore
+from eventum_hq.services.tasks import TaskService
 from eventum_hq.services.users import UserService
 
 log = logging.getLogger("eventum_hq")
@@ -35,9 +37,11 @@ async def run(settings: Settings) -> None:
     owner = await users.ensure_owner()
     log.info("owner ready user_id=%s", owner.id)
 
+    tasks = TaskService(db, clock, NoopSync())
+
     bot = build_bot(settings)
-    outbox = OutboxSender(bot, OutboxStore(db, clock), users)
-    dp = build_dispatcher(settings=settings, users=users, outbox=outbox)
+    outbox = OutboxSender(bot, OutboxStore(db, clock), users, tasks, clock)
+    dp = build_dispatcher(settings=settings, users=users, tasks=tasks, outbox=outbox, clock=clock)
     try:
         me = await bot.get_me()
         log.info("connected as @%s (id=%s)", me.username, me.id)

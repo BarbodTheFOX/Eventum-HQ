@@ -6,7 +6,7 @@ Messages are sent with HTML parse mode: escape any user-provided value with
 
 from __future__ import annotations
 
-from eventum_hq.models import Role
+from eventum_hq.models import ApprovalChain, Role, TaskStatus
 from eventum_hq.services.permissions import MenuItem
 
 # ---- main menu -------------------------------------------------------------
@@ -115,6 +115,7 @@ HELP = (
     "/my — کارهای من\n"
     "/cancel — لغو کار نیمه‌تمام\n"
     "/help — همین راهنما\n\n"
+    "برای دیدن یک تسک، کد آن را بفرستید؛ مثلاً <code>T-0012</code>.\n\n"
     "دکمه‌های منو بر اساس نقش شما نمایش داده می‌شوند. "
     "بخش‌ها به‌تدریج فعال می‌شوند."
 )
@@ -128,3 +129,179 @@ COMMANDS: dict[str, str] = {
     "cancel": "لغو کار نیمه‌تمام",
     "help": "راهنما",
 }
+
+# ---- tasks: labels -------------------------------------------------------------
+
+STATUS_LABELS: dict[TaskStatus, str] = {
+    TaskStatus.TODO: "⏳ در انتظار",
+    TaskStatus.BLOCKED: "🔒 مسدود",
+    TaskStatus.IN_PROGRESS: "🛠 در حال انجام",
+    TaskStatus.IN_REVIEW: "👀 در بررسی",
+    TaskStatus.CHANGES_REQUESTED: "✏️ نیاز به اصلاح",
+    TaskStatus.APPROVED: "✅ تأییدشده",
+    TaskStatus.CANCELLED: "❌ لغوشده",
+}
+STATUS_EMOJI: dict[TaskStatus, str] = {s: label.split(" ", 1)[0] for s, label in STATUS_LABELS.items()}
+OVERDUE_EMOJI = "🔴"
+AT_RISK_EMOJI = "🟠"
+
+CHAIN_LABELS: dict[ApprovalChain, str] = {
+    ApprovalChain.FINAL: "فقط تأیید مدیر",
+    ApprovalChain.L1_FINAL: "بررسی مرحلهٔ اول، سپس تأیید مدیر",
+    ApprovalChain.NONE: "بدون تأیید (با «انجام شد» تمام می‌شود)",
+}
+
+WEEKDAYS = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"]  # Saturday = 0
+DATE_FORMAT = "{weekday} {y}/{m:02d}/{d:02d}"
+DATETIME_FORMAT = "{weekday} {y}/{m:02d}/{d:02d} ساعت {hh:02d}:{mm:02d}"
+UNIT_MINUTE = "دقیقه"
+UNIT_HOUR = "ساعت"
+UNIT_DAY = "روز"
+DELTA_LEFT = "{n} {unit} مانده"
+DELTA_LATE = "{n} {unit} تأخیر"
+NO_DEADLINE = "بدون ددلاین"
+NO_SERIES = "—"
+NO_DESCRIPTION = "—"
+SYSTEM_ACTOR = "سیستم"
+
+AUDIT_LABELS: dict[str, str] = {
+    "task.created": "ساخته شد",
+    "task.started": "شروع شد",
+    "task.cancelled": "لغو شد",
+    "task.due_changed": "ددلاین تغییر کرد",
+    "task.reassigned": "مسئول تغییر کرد",
+}
+
+# ---- tasks: card ---------------------------------------------------------------
+
+TASK_CARD = (
+    "<b>{code}</b> · {title}\n\n"
+    "وضعیت: {status}\n"
+    "مسئول: {assignee}\n"
+    "ددلاین: {due}\n"
+    "سری: {series}\n"
+    "زنجیرهٔ تأیید: {chain}\n"
+    "دور اصلاح: {rounds}\n"
+    "سازنده: {creator}"
+)
+TASK_CARD_DESCRIPTION = "\n\n📝 توضیح:\n{description}"
+TASK_CARD_BRIEF = "\n📎 بریف: {count} فایل"
+TASK_CARD_LAST_EVENT = "\n\nآخرین رویداد: {event} — {actor}، {when}"
+DUE_WITH_DELTA = "{due} ({emoji}{delta})"
+
+BTN_START = "▶️ شروع کار"
+BTN_BRIEF = "📎 دریافت بریف"
+BTN_CHANGE_DUE = "📅 تغییر ددلاین"
+BTN_REASSIGN = "👤 تغییر مسئول"
+BTN_CANCEL_TASK = "❌ لغو تسک"
+BTN_HISTORY = "📜 تاریخچه"
+BTN_BACK_TO_CARD = "↩️ بازگشت به کارت"
+BTN_CONFIRM_CANCEL = "✅ بله، لغو شود"
+BTN_KEEP_TASK = "↩️ نه"
+CONFIRM_CANCEL_TASK = "\n\n⚠️ <b>این تسک لغو شود؟</b> مسئول پیام می‌گیرد."
+REASSIGN_PROMPT = "\n\n👤 <b>مسئول جدید را انتخاب کنید:</b>"
+
+TASK_STARTED = "🛠 کار شروع شد."
+TASK_CANCELLED = "❌ تسک لغو شد."
+TASK_REASSIGNED = "✅ مسئول به {name} تغییر کرد."
+TASK_DUE_CHANGED = "✅ ددلاین {code} تغییر کرد: {due}"
+TASK_STATE_CHANGED = "وضعیت این تسک عوض شده است. کارت به‌روز شد."
+TASK_CODE_NOT_FOUND = "تسکی با کد {code} پیدا نشد."
+STALE_BUTTON = "این دکمه دیگر فعال نیست."
+
+HISTORY_HEADER = "📜 <b>تاریخچهٔ {code}</b>\n"
+HISTORY_LINE = "\n• {when} — {label} — {actor}"
+
+# ---- tasks: lists --------------------------------------------------------------
+
+MY_TASKS_HEADER = "📋 <b>کارهای من</b> ({count})"
+MY_TASKS_EMPTY = "📋 کار بازی ندارید. 🎉"
+ALL_TASKS_MENU = "🗂 <b>همهٔ کارها</b>\nکدام فهرست را می‌خواهید؟"
+BTN_FILTER_OPEN = "📂 باز"
+BTN_FILTER_OVERDUE = "🔴 عقب‌افتاده"
+BTN_FILTER_AT_RISK = "🟠 در خطر"
+BTN_FILTER_BY_USER = "👤 بر اساس نفر"
+BTN_FILTER_BY_SERIES = "🗂 بر اساس سری"
+LIST_HEADER_OPEN = "📂 <b>کارهای باز</b> ({count})"
+LIST_HEADER_OVERDUE = "🔴 <b>عقب‌افتاده</b> ({count})"
+LIST_HEADER_AT_RISK = "🟠 <b>در خطر</b> — ددلاین در ۲۴ ساعت آینده ({count})"
+LIST_HEADER_USER = "👤 <b>کارهای باز {name}</b> ({count})"
+LIST_HEADER_SERIES = "🗂 <b>سری {name}</b> ({count})"
+LIST_EMPTY = "\n\nموردی نیست."
+LIST_LINE = "\n{emoji} <b>{code}</b> {title} — {assignee}{delta}"
+LIST_LINE_DELTA = " — {delta}"
+PICK_PERSON = "👤 کارهای چه کسی؟"
+PICK_SERIES = "🗂 کدام سری؟"
+BTN_PREV = "« قبلی"
+BTN_NEXT = "بعدی »"
+PAGE_LABEL = "{page}/{pages}"
+BTN_BACK_TO_FILTERS = "↩️ فیلترها"
+
+# ---- tasks: create flow --------------------------------------------------------
+
+NEW_TASK_TITLE = "➕ <b>تسک جدید</b>\n\nعنوان تسک را بنویسید:\n(برای لغو در هر مرحله: /cancel)"
+NEW_TASK_DESCRIPTION = (
+    "📝 توضیح یا بریف را بفرستید: متن، ویس، عکس، ویدیو یا فایل.\n"
+    "اگر توضیحی ندارد، «رد کردن» را بزنید."
+)
+NEW_TASK_ASSIGNEE = "👤 مسئول این تسک کیست؟"
+DUE_DATE_PROMPT = (
+    "📅 ددلاین چه روزی است؟\n"
+    "یکی از دکمه‌ها را بزنید یا تاریخ را بنویسید، مثلاً <code>1405/08/20</code> "
+    "یا <code>8/20 18:30</code>."
+)
+EDIT_DUE_PROMPT = "📅 ددلاین جدید <b>{code}</b>\n\n" + DUE_DATE_PROMPT
+DUE_TIME_PROMPT = (
+    "⏰ ساعت ددلاین ({date})؟\n"
+    "یکی از دکمه‌ها را بزنید یا ساعت را بنویسید، مثلاً <code>16:30</code>."
+)
+DUE_PAST_CONFIRM = "⚠️ این زمان گذشته است: {due}\nمطمئنید؟"
+BTN_PAST_YES = "✅ بله، همین زمان"
+BTN_PAST_NO = "✏️ زمان دیگر"
+QUICK_DATE_LABELS = {
+    "today": "امروز",
+    "tomorrow": "فردا",
+    "after": "پس‌فردا",
+    "sat": "شنبهٔ آینده",
+}
+NEW_TASK_SERIES = "🗂 سری این تسک؟ (اختیاری)"
+BTN_NO_SERIES = "بدون سری"
+NEW_TASK_CHAIN = "✅ زنجیرهٔ تأیید؟\nپیش‌فرض: <b>فقط تأیید مدیر</b>."
+NEW_TASK_CONFIRM = (
+    "🧾 <b>بررسی نهایی</b>\n\n"
+    "عنوان: {title}\n"
+    "مسئول: {assignee}\n"
+    "ددلاین: {due}\n"
+    "سری: {series}\n"
+    "زنجیرهٔ تأیید: {chain}\n"
+    "توضیح: {description}"
+)
+NEW_TASK_BRIEF_FILE = "📎 یک فایل"
+BTN_SKIP = "⏭ رد کردن"
+BTN_CREATE_TASK = "✅ ساخت تسک"
+BTN_ABORT = "❌ لغو"
+TASK_CREATED = "✅ تسک <b>{code}</b> ساخته شد و برای مسئول ارسال شد."
+TASK_CREATED_SELF = "✅ تسک <b>{code}</b> ساخته شد."
+SEND_TITLE_AS_TEXT = "لطفاً عنوان را به‌صورت متن بفرستید."
+UNSUPPORTED_BRIEF = "این نوع پیام پشتیبانی نمی‌شود. متن، ویس، عکس، ویدیو یا فایل بفرستید."
+INVALID_DATE = "تاریخ نامعتبر است. نمونه: <code>1405/08/20</code> یا <code>8/20 18:30</code>"
+INVALID_TIME = "ساعت نامعتبر است. نمونه: <code>18:30</code>"
+FLOW_EXPIRED = "⌛️ کار نیمه‌تمام قبلی به‌خاطر ۳۰ دقیقه بی‌فعالیتی لغو شد."
+FLOW_ABORTED = "لغو شد. ✅"
+
+VALIDATION_MESSAGES: dict[str, str] = {
+    "title_empty": "عنوان نمی‌تواند خالی باشد.",
+    "title_too_long": "عنوان حداکثر ۲۰۰ کاراکتر است.",
+    "description_too_long": "توضیح حداکثر ۳۰۰۰ کاراکتر است.",
+    "assignee_inactive": "این کاربر فعال نیست.",
+    "series_invalid": "این سری معتبر نیست.",
+    "same_due": "ددلاین جدید با قبلی یکی است.",
+    "same_assignee": "همین نفر الان مسئول است.",
+}
+
+# ---- tasks: notifications ------------------------------------------------------
+
+NOTIFY_TASK_ASSIGNED = "📌 <b>تسک جدید برای شما</b>\n\n"
+NOTIFY_TASK_DUE_CHANGED = "📅 <b>ددلاین تسک شما تغییر کرد</b>\n\n"
+NOTIFY_TASK_UNASSIGNED = "↪️ تسک <b>{code}</b> «{title}» به نفر دیگری سپرده شد."
+NOTIFY_TASK_CANCELLED = "❌ تسک <b>{code}</b> «{title}» لغو شد."

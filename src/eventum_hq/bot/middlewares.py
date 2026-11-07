@@ -13,13 +13,18 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Awaitable, Callable
+from datetime import timedelta
 from typing import Any
 
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, Update
+from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message, TelegramObject, Update
+
+from eventum_hq.bot import texts
 
 from eventum_hq.bot.keyboards.access import JOIN_PREFIX
 from eventum_hq.bot.outbox import OutboxSender
+from eventum_hq.core.timeutil import Clock
 from eventum_hq.services.users import UserService
 
 log = logging.getLogger(__name__)
@@ -98,3 +103,38 @@ class OutboxFlushMiddleware(BaseMiddleware):
                 await self._outbox.flush_urgent()
             except Exception:
                 log.exception("urgent outbox flush failed")
+
+
+FLOW_TIMEOUT = timedelta(minutes=30)
+_TOUCHED_KEY = "_touched"
+
+
+class FlowTimeoutMiddleware(BaseMiddleware):
+    """Unfinished flows (FSM states) expire after 30 minutes without activity (§5.1).
+
+    Registered on messages and callback queries. Before the handler: if the
+    current flow is too old, clear it and tell the user. After the handler: if
+    a flow is (still) active, remember "now" as its last activity.
+    """
+
+    def __init__(self, clock: Clock, timeout: timedelta = FLOW_TIMEOUT) -> None:
+        self._clock = clock
+        self._timeout = timeout
+
+    async def __call__(self, handler: Handler, event: TelegramObject, data: dict[str, Any]) -> Any:
+        state: FSMContext | None = data.get("state")
+        if state is not None and await state.get_state() is not None:
+            touched = (await state.get_data()).get(_TOUCHED_KEY)
+            now = self._clock.now().timestamp()
+            if touched is not None and now - float(touched) > self._timeout.total_seconds():
+                await state.clear()
+                # state filters read this cached value, not the storage
+                data["raw_state"] = None
+                if isinstance(event, Message):
+                    await event.answer(texts.FLOW_EXPIRED)
+                elif isinstance(event, CallbackQuery) and isinstance(event.message, Message):
+                    await event.message.answer(texts.FLOW_EXPIRED)
+        result = await handler(event, data)
+        if state is not None and await state.get_state() is not None:
+            await state.update_data({_TOUCHED_KEY: self._clock.now().timestamp()})
+        return result

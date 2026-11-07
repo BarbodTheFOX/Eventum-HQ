@@ -18,12 +18,16 @@ from aiogram.exceptions import (
 from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 from eventum_hq.bot import texts
-from eventum_hq.bot.formatters import access_request_card, role_label
+from eventum_hq.bot.formatters import access_request_card, esc, role_label, task_card
 from eventum_hq.bot.keyboards.access import access_request_keyboard
 from eventum_hq.bot.keyboards.main_menu import main_menu
+from eventum_hq.bot.keyboards.tasks import task_card_keyboard
+from eventum_hq.core.timeutil import Clock
 from eventum_hq.models import Notification
+from eventum_hq.services import tasks as task_kinds
 from eventum_hq.services import users as user_kinds
 from eventum_hq.services.notifications import OutboxStore
+from eventum_hq.services.tasks import TaskService
 from eventum_hq.services.users import UserService
 
 log = logging.getLogger(__name__)
@@ -39,8 +43,41 @@ class UnknownNotificationKind(Exception):
     pass
 
 
-async def render(row: Notification, users: UserService) -> tuple[str, Markup]:
+_TASK_CARD_KINDS = {task_kinds.KIND_TASK_ASSIGNED, task_kinds.KIND_TASK_DUE_CHANGED}
+
+
+class UndeliverableNotification(Exception):
+    """The notification no longer makes sense (e.g. recipient lost access)."""
+
+
+async def render(
+    row: Notification,
+    users: UserService,
+    tasks: TaskService | None = None,
+    clock: Clock | None = None,
+) -> tuple[str, Markup]:
     payload = row.payload or {}
+    if row.kind in _TASK_CARD_KINDS:
+        if tasks is None or clock is None:
+            raise UnknownNotificationKind(row.kind)
+        recipient = await users.get(int(payload["user_id"]))
+        if recipient is None or not recipient.can_use_bot:
+            raise UndeliverableNotification("recipient inactive")
+        view = await tasks.get_view(recipient, task_id=int(payload["task_id"]))
+        prefix = (
+            texts.NOTIFY_TASK_ASSIGNED
+            if row.kind == task_kinds.KIND_TASK_ASSIGNED
+            else texts.NOTIFY_TASK_DUE_CHANGED
+        )
+        return prefix + task_card(view, clock.now()), task_card_keyboard(view)
+    if row.kind == task_kinds.KIND_TASK_UNASSIGNED:
+        return texts.NOTIFY_TASK_UNASSIGNED.format(
+            code=esc(payload["code"]), title=esc(payload["title"])
+        ), None
+    if row.kind == task_kinds.KIND_TASK_CANCELLED:
+        return texts.NOTIFY_TASK_CANCELLED.format(
+            code=esc(payload["code"]), title=esc(payload["title"])
+        ), None
     if row.kind == user_kinds.KIND_ACCESS_REQUEST:
         requested_role = payload["requested_role"]
         text = access_request_card(
@@ -61,10 +98,19 @@ async def render(row: Notification, users: UserService) -> tuple[str, Markup]:
 
 
 class OutboxSender:
-    def __init__(self, sender: MessageSender, store: OutboxStore, users: UserService) -> None:
+    def __init__(
+        self,
+        sender: MessageSender,
+        store: OutboxStore,
+        users: UserService,
+        tasks: TaskService | None = None,
+        clock: Clock | None = None,
+    ) -> None:
         self._sender = sender
         self._store = store
         self._users = users
+        self._tasks = tasks
+        self._clock = clock
         self._lock = asyncio.Lock()  # never deliver the same row twice in parallel
 
     async def flush_urgent(self) -> int:
@@ -78,7 +124,7 @@ class OutboxSender:
 
     async def _deliver(self, row: Notification) -> bool:
         try:
-            text, markup = await render(row, self._users)
+            text, markup = await render(row, self._users, self._tasks, self._clock)
         except Exception as exc:  # broken payload / unknown kind: do not retry
             log.exception("outbox render failed id=%s kind=%s", row.id, row.kind)
             await self._store.mark_failed(row.id, f"render: {exc!r}", permanent=True)

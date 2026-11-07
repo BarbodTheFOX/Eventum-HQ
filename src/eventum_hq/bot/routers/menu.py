@@ -35,13 +35,11 @@ async def cmd_cancel(
     await message.answer(text, reply_markup=menu_for(current_user, admin_views))
 
 
-@router.message(Command("my"))
-async def cmd_my(message: Message, current_user: User, admin_views: AdminViews) -> None:
-    await _open_section(message, current_user, admin_views, MenuItem.MY_TASKS)
-
-
 @router.message(F.text.in_(set(LABEL_TO_ITEM)))
-async def on_menu_button(message: Message, current_user: User, admin_views: AdminViews) -> None:
+async def on_menu_button(
+    message: Message, state: FSMContext, current_user: User, admin_views: AdminViews
+) -> None:
+    await state.clear()  # a menu button always leaves any unfinished flow
     item = LABEL_TO_ITEM[message.text or ""]
     await _open_section(message, current_user, admin_views, item)
 

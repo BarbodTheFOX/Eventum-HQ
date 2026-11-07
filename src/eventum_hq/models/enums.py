@@ -41,6 +41,40 @@ class SeriesKind(StrEnum):
     OTHER = "OTHER"
 
 
+class TaskKind(StrEnum):
+    EDIT = "EDIT"
+    COVER = "COVER"
+    GENERIC = "GENERIC"
+
+
+class TaskStatus(StrEnum):
+    BLOCKED = "BLOCKED"
+    TODO = "TODO"
+    IN_PROGRESS = "IN_PROGRESS"
+    IN_REVIEW = "IN_REVIEW"
+    CHANGES_REQUESTED = "CHANGES_REQUESTED"
+    APPROVED = "APPROVED"
+    CANCELLED = "CANCELLED"
+
+
+class ReviewStage(StrEnum):
+    L1 = "L1"
+    FINAL = "FINAL"
+
+
+class ApprovalChain(StrEnum):
+    NONE = "NONE"  # assignee's "done" approves
+    FINAL = "FINAL"  # Farid only (default for generic tasks)
+    L1_FINAL = "L1_FINAL"  # Amin, then Farid (default for reel EDIT/COVER)
+
+
+class TaskInputKind(StrEnum):
+    TIMECODES = "TIMECODES"
+    COVER_TEXT = "COVER_TEXT"
+    COVER_PHOTOS = "COVER_PHOTOS"
+    BRIEF = "BRIEF"
+
+
 class NotificationStatus(StrEnum):
     PENDING = "PENDING"
     SENT = "SENT"

@@ -23,6 +23,23 @@ class InvalidRole(DomainError):
     """A role that may not be requested or assigned here (e.g. OWNER)."""
 
 
+class InvalidTransition(DomainError):
+    """The task is not in a state that allows this action (e.g. stale button)."""
+
+    def __init__(self, current: str, target: str) -> None:
+        super().__init__(f"{current} -> {target}")
+        self.current = current
+        self.target = target
+
+
+class ValidationFailed(DomainError):
+    """Input rejected by a business rule. ``code`` tells the bot which message to show."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
 class AlreadyDecided(DomainError):
     """The item was already handled (e.g. an access request decided earlier)."""
 
