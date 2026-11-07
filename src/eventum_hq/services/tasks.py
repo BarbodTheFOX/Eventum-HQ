@@ -37,6 +37,7 @@ from eventum_hq.models import (
     User,
 )
 from eventum_hq.repositories import audit as audit_repo
+from eventum_hq.repositories import reviews as reviews_repo
 from eventum_hq.repositories import series as series_repo
 from eventum_hq.repositories import tasks as tasks_repo
 from eventum_hq.repositories import users as users_repo
@@ -132,6 +133,10 @@ class TaskView:
     last_actor: User | None
     can_start: bool
     can_manage: bool
+    can_submit: bool = False  # 📤 deliver for review
+    can_mark_done: bool = False  # ✅ done (chain NONE)
+    can_finish: bool = False  # 🏁 done after approval (v1.2)
+    latest_version: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,6 +260,9 @@ class TaskService:
                     session, last.actor_id
                 )
             open_ = is_open(task.status)
+            is_assignee = task.assignee_id == fresh.id
+            needs_review = task.approval_chain != ApprovalChain.NONE
+            latest_version = await reviews_repo.max_version(session, task.id)
             return TaskView(
                 task=task,
                 assignee=people[task.assignee_id],
@@ -266,6 +274,15 @@ class TaskService:
                 can_start=task.assignee_id == fresh.id
                 and task.status in (TaskStatus.TODO, TaskStatus.CHANGES_REQUESTED),
                 can_manage=open_ and can_manage_task(fresh, task),
+                can_submit=is_assignee
+                and needs_review
+                and task.status in (TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.CHANGES_REQUESTED),
+                can_mark_done=is_assignee
+                and not needs_review
+                and task.status in (TaskStatus.TODO, TaskStatus.IN_PROGRESS),
+                can_finish=task.status == TaskStatus.APPROVED
+                and (is_assignee or can_manage_task(fresh, task)),
+                latest_version=latest_version,
             )
 
     async def list_my(self, viewer: User) -> list[TaskRow]:

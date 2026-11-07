@@ -23,6 +23,9 @@ from eventum_hq.core.logging import setup_logging
 from eventum_hq.core.migrate import upgrade_to_head
 from eventum_hq.core.timeutil import SystemClock
 from eventum_hq.integrations.sync import NoopSync
+from eventum_hq.integrations.telegram_archive import TelegramArchive
+from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.reviews import ReviewService
 from eventum_hq.services.notifications import OutboxStore
 from eventum_hq.services.tasks import TaskService
 from eventum_hq.services.users import UserService
@@ -37,11 +40,20 @@ async def run(settings: Settings) -> None:
     owner = await users.ensure_owner()
     log.info("owner ready user_id=%s", owner.id)
 
-    tasks = TaskService(db, clock, NoopSync())
+    sync = NoopSync()
+    tasks = TaskService(db, clock, sync)
+    reviews = ReviewService(db, clock, sync)
+    delegations = DelegationService(db, clock)
 
     bot = build_bot(settings)
-    outbox = OutboxSender(bot, OutboxStore(db, clock), users, tasks, clock)
-    dp = build_dispatcher(settings=settings, users=users, tasks=tasks, outbox=outbox, clock=clock)
+    archive = TelegramArchive(bot, settings.archive_channel_id)
+    if not archive.configured:
+        log.warning("ARCHIVE_CHANNEL_ID is empty: file deliveries are disabled until it is set")
+    outbox = OutboxSender(bot, OutboxStore(db, clock), users, tasks, clock, reviews, archive)
+    dp = build_dispatcher(
+        settings=settings, users=users, tasks=tasks, reviews=reviews, delegations=delegations,
+        archive=archive, outbox=outbox, clock=clock,
+    )
     try:
         me = await bot.get_me()
         log.info("connected as @%s (id=%s)", me.username, me.id)

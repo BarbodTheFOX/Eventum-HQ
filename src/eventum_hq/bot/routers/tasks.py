@@ -25,12 +25,14 @@ from eventum_hq.bot.keyboards.tasks import (
     reassign_keyboard,
     task_list_keyboard,
 )
+from eventum_hq.bot.routers.deliver import start_submit
 from eventum_hq.bot.routers.task_create import start_due_edit, start_new_task
 from eventum_hq.bot.task_ui import edit_card, reply, send_card
 from eventum_hq.core.errors import InvalidTransition, NotFound, PermissionDenied, ValidationFailed
 from eventum_hq.core.timeutil import Clock
 from eventum_hq.models import Capability, User
 from eventum_hq.services.permissions import MenuItem, has_capability
+from eventum_hq.services.reviews import ReviewService
 from eventum_hq.services.tasks import TaskFilter, TaskService, parse_task_code
 
 router = Router(name="tasks")
@@ -136,7 +138,7 @@ async def _list_header(scope: ListScope, arg: int, count: int, tasks: TaskServic
 @router.callback_query(TaskCb.filter())
 async def on_task_button(
     query: CallbackQuery, callback_data: TaskCb, state: FSMContext, bot: Bot,
-    current_user: User, tasks: TaskService, clock: Clock,
+    current_user: User, tasks: TaskService, reviews: ReviewService, clock: Clock,
 ) -> None:
     action, task_id = callback_data.action, callback_data.task_id
     toast: str | None = None
@@ -177,6 +179,15 @@ async def on_task_button(
             new_assignee = next((u for u in await tasks.assignable_users() if u.id == task.assignee_id), None)
             await edit_card(query, tasks, current_user, task_id, clock)
             toast = texts.TASK_REASSIGNED.format(name=user_label(new_assignee, html=False))
+        elif action == TaskAction.SUBMIT:
+            view = await tasks.get_view(current_user, task_id=task_id)
+            if not view.can_submit:
+                raise InvalidTransition(str(view.task.status), "SUBMIT")
+            await start_submit(query, state, task_id, view.task.code)
+        elif action == TaskAction.DONE:
+            task = await reviews.mark_done(current_user, task_id)
+            await edit_card(query, tasks, current_user, task_id, clock)
+            toast = texts.DONE_OK.format(code=task.code)
         elif action == TaskAction.HISTORY:
             task, entries = await tasks.history(current_user, task_id)
             await reply(query, history_text(task, entries), back_to_card_keyboard(task_id))

@@ -48,7 +48,7 @@ async def _open_section(
     message: Message, user: User, admin_views: AdminViews, item: MenuItem
 ) -> None:
     # Re-check on the server: the user may have typed the label by hand.
-    if not can_use_menu_item(user, item):
+    if not can_use_menu_item(user, item, is_delegate=admin_views.is_delegate(user.telegram_id)):
         await message.answer(texts.PERMISSION_DENIED, reply_markup=menu_for(user, admin_views))
         return
     if item in (MenuItem.ADMIN_VIEW_ON, MenuItem.ADMIN_VIEW_OFF):

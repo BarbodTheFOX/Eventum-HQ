@@ -20,6 +20,9 @@ from eventum_hq.bot.outbox import OutboxSender
 from eventum_hq.bot.routers import build_root_router
 from eventum_hq.core.config import Settings
 from eventum_hq.core.timeutil import Clock
+from eventum_hq.integrations.telegram_archive import TelegramArchive
+from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.reviews import ReviewService
 from eventum_hq.services.tasks import TaskService
 from eventum_hq.services.users import UserService
 
@@ -38,22 +41,30 @@ def build_dispatcher(
     settings: Settings,
     users: UserService,
     tasks: TaskService,
+    reviews: ReviewService,
+    delegations: DelegationService,
+    archive: TelegramArchive,
     outbox: OutboxSender,
     clock: Clock,
 ) -> Dispatcher:
+    admin_views = AdminViews()
     dp = Dispatcher(
         storage=MemoryStorage(),
         # injected into handlers by parameter name
         users=users,
         tasks=tasks,
+        reviews=reviews,
+        delegations=delegations,
+        archive=archive,
         outbox=outbox,
         clock=clock,
-        admin_views=AdminViews(),
+        admin_views=admin_views,
         team_group_id=settings.team_group_id,
+        owner_telegram_id=settings.owner_telegram_id,
     )
     # Outer middlewares run in registration order: flush wraps the access gate.
     dp.update.outer_middleware(OutboxFlushMiddleware(outbox))
-    dp.update.outer_middleware(AccessMiddleware(users))
+    dp.update.outer_middleware(AccessMiddleware(users, delegations, admin_views))
     timeout = FlowTimeoutMiddleware(clock)
     dp.message.outer_middleware(timeout)
     dp.callback_query.outer_middleware(timeout)

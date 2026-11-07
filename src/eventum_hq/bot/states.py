@@ -24,3 +24,18 @@ class DateInput(StatesGroup):
 # keys in FSM data
 PURPOSE_NEW = "new"
 PURPOSE_DUE = "due"
+
+
+class SubmitFlow(StatesGroup):
+    """Collect files / links / note for one delivery. Data: task_id, items, links, note."""
+
+    collect = State()
+
+
+class ReviewNotesFlow(StatesGroup):
+    """Collect change-request notes. Data: submission_id, version, stage, texts, files."""
+
+    collect = State()
+
+
+PURPOSE_DELEGATION = "delegation"

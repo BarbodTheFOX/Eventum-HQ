@@ -76,6 +76,17 @@ class TaskInputKind(StrEnum):
     BRIEF = "BRIEF"
 
 
+class ReviewDecision(StrEnum):
+    APPROVED = "APPROVED"
+    CHANGES_REQUESTED = "CHANGES_REQUESTED"
+
+
+class OutputType(StrEnum):
+    REEL_VIDEO = "REEL_VIDEO"
+    REEL_COVER = "REEL_COVER"
+    OTHER = "OTHER"
+
+
 class NotificationStatus(StrEnum):
     PENDING = "PENDING"
     SENT = "SENT"

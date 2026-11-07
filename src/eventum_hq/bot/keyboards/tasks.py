@@ -31,6 +31,8 @@ class TaskAction(StrEnum):
     ASSIGN_TO = "a"  # arg = new assignee user id
     HISTORY = "h"
     BRIEF = "b"
+    SUBMIT = "sub"
+    DONE = "done"
 
 
 class TaskCb(CallbackData, prefix="t"):
@@ -110,6 +112,11 @@ def task_card_keyboard(view: TaskView) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if view.can_start:
         rows.append([_btn(texts.BTN_START, TaskCb(action=TaskAction.START, task_id=tid))])
+    if view.can_submit:
+        rows.append([_btn(texts.BTN_SUBMIT, TaskCb(action=TaskAction.SUBMIT, task_id=tid))])
+    if view.can_mark_done or view.can_finish:
+        label = texts.BTN_FINISH if view.can_finish else texts.BTN_MARK_DONE
+        rows.append([_btn(label, TaskCb(action=TaskAction.DONE, task_id=tid))])
     if view.brief is not None and view.brief.attachments:
         rows.append([_btn(texts.BTN_BRIEF, TaskCb(action=TaskAction.BRIEF, task_id=tid))])
     if view.can_manage:
@@ -310,3 +317,109 @@ def past_confirm_keyboard() -> InlineKeyboardMarkup:
             _abort_row(),
         ]
     )
+
+
+# ---- M2: delivery / review / team ----------------------------------------------------
+
+
+class SubmitAction(StrEnum):
+    SEND = "send"
+    ABORT = "abort"
+
+
+class SubmitCb(CallbackData, prefix="sb"):
+    action: SubmitAction
+
+
+class ReviewAction(StrEnum):
+    OPEN = "o"  # submission_id field carries the task id
+    APPROVE = "ok"
+    CHANGES = "ch"
+    DETAILS = "d"  # submission_id field carries the task id
+
+
+class ReviewCb(CallbackData, prefix="rv"):
+    action: ReviewAction
+    submission_id: int
+    version: int = 0
+    stage: str = ""
+
+
+class NotesAction(StrEnum):
+    DONE = "done"
+    ABORT = "abort"
+
+
+class NotesCb(CallbackData, prefix="rn"):
+    action: NotesAction
+
+
+class TeamAction(StrEnum):
+    HOME = "home"
+    NEW_DELEGATION = "newdel"
+    PICK_DELEGATE = "pick"  # arg = user id
+    REVOKE = "revoke"  # arg = delegation id
+
+
+class TeamCb(CallbackData, prefix="tm"):
+    action: TeamAction
+    arg: int = 0
+
+
+def submit_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_btn(texts.BTN_SEND_FOR_REVIEW, SubmitCb(action=SubmitAction.SEND))],
+            [_btn(texts.BTN_ABORT, SubmitCb(action=SubmitAction.ABORT))],
+        ]
+    )
+
+
+def notes_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_btn(texts.BTN_NOTES_DONE, NotesCb(action=NotesAction.DONE))],
+            [_btn(texts.BTN_ABORT, NotesCb(action=NotesAction.ABORT))],
+        ]
+    )
+
+
+def review_keyboard(task_id: int, submission_id: int, version: int, stage: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                _btn(texts.BTN_APPROVE, ReviewCb(action=ReviewAction.APPROVE, submission_id=submission_id,
+                                                 version=version, stage=stage)),
+                _btn(texts.BTN_REQUEST_CHANGES, ReviewCb(action=ReviewAction.CHANGES,
+                                                         submission_id=submission_id,
+                                                         version=version, stage=stage)),
+            ],
+            [_btn(texts.BTN_DETAILS, ReviewCb(action=ReviewAction.DETAILS, submission_id=task_id))],
+        ]
+    )
+
+
+def review_queue_keyboard(rows_on_page: list[TaskRow], now: datetime) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_btn(task_button_label(r.task, now), ReviewCb(action=ReviewAction.OPEN, submission_id=r.task.id))]
+            for r in rows_on_page
+        ]
+    )
+
+
+def team_keyboard(*, can_delegate: bool, active_delegation_id: int | None) -> InlineKeyboardMarkup:
+    rows = []
+    if can_delegate:
+        rows.append([_btn(texts.BTN_NEW_DELEGATION, TeamCb(action=TeamAction.NEW_DELEGATION))])
+        if active_delegation_id is not None:
+            rows.append([_btn(texts.BTN_REVOKE_DELEGATION,
+                              TeamCb(action=TeamAction.REVOKE, arg=active_delegation_id))])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def delegate_pick_keyboard(users: list[User]) -> InlineKeyboardMarkup:
+    rows = [[_btn(user_label(u, with_role=True, html=False), TeamCb(action=TeamAction.PICK_DELEGATE, arg=u.id))]
+            for u in users]
+    rows.append([_btn(texts.BTN_ABORT, TeamCb(action=TeamAction.HOME))])
+    return InlineKeyboardMarkup(inline_keyboard=rows)

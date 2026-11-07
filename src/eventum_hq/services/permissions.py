@@ -8,7 +8,7 @@ from __future__ import annotations
 from enum import StrEnum
 
 from eventum_hq.core.errors import PermissionDenied
-from eventum_hq.models import Capability, Role, Task, User
+from eventum_hq.models import ApprovalChain, Capability, Role, Task, User
 
 ALL_CAPABILITIES: frozenset[Capability] = frozenset(Capability)
 
@@ -90,13 +90,15 @@ def is_owner(user: User) -> bool:
 
 
 def can_view_task(user: User, task: Task) -> bool:
-    """Assignee, creator, or anyone with VIEW_ALL_TASKS."""
+    """Assignee, creator, VIEW_ALL_TASKS holders, and L1 reviewers for L1_FINAL tasks."""
     if not user.can_use_bot:
         return False
     return (
         task.assignee_id == user.id
         or task.created_by == user.id
         or has_capability(user, C.VIEW_ALL_TASKS)
+        # first-stage reviewers can open the tasks they review (details and history)
+        or (has_capability(user, C.REVIEW_L1) and task.approval_chain == ApprovalChain.L1_FINAL)
     )
 
 
@@ -145,16 +147,23 @@ def _items_for(capabilities: frozenset[Capability]) -> list[MenuItem]:
     return [item for item, cap in _MENU_RULES if cap is None or cap in capabilities]
 
 
-def can_use_menu_item(user: User, item: MenuItem) -> bool:
+def _with_delegation(caps: frozenset[Capability], is_delegate: bool) -> frozenset[Capability]:
+    # the temporary delegate (section 4.4) sees the approval queue while the delegation lasts
+    return caps | {C.APPROVE_FINAL} if is_delegate else caps
+
+
+def can_use_menu_item(user: User, item: MenuItem, *, is_delegate: bool = False) -> bool:
     """Server-side permission check for a menu item (independent of the view)."""
     if not user.can_use_bot:
         return False
     if item in _ADMIN_TOGGLES:
         return is_owner(user)
-    return item in _items_for(effective_capabilities(user))
+    return item in _items_for(_with_delegation(effective_capabilities(user), is_delegate))
 
 
-def visible_menu_items(user: User, *, admin_view: bool = False) -> list[MenuItem]:
+def visible_menu_items(
+    user: User, *, admin_view: bool = False, is_delegate: bool = False
+) -> list[MenuItem]:
     """Buttons shown on the keyboard.
 
     OWNER: normal view = own work (stored capabilities) + "admin view" button;
@@ -166,5 +175,8 @@ def visible_menu_items(user: User, *, admin_view: bool = False) -> list[MenuItem
     if is_owner(user):
         if admin_view:
             return [*_items_for(ALL_CAPABILITIES), MenuItem.ADMIN_VIEW_OFF]
-        return [*_items_for(stored_capabilities(user)), MenuItem.ADMIN_VIEW_ON]
-    return _items_for(effective_capabilities(user))
+        return [
+            *_items_for(_with_delegation(stored_capabilities(user), is_delegate)),
+            MenuItem.ADMIN_VIEW_ON,
+        ]
+    return _items_for(_with_delegation(effective_capabilities(user), is_delegate))

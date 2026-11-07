@@ -7,7 +7,8 @@ from html import escape
 
 from eventum_hq.bot import texts
 from eventum_hq.core.jalali import jalali_date_parts, jalali_parts
-from eventum_hq.models import Role, Task, User
+from eventum_hq.models import Role, Task, TaskStatus, User
+from eventum_hq.services.reviews import ReviewView
 from eventum_hq.services.tasks import (
     DeadlineState,
     HistoryEntry,
@@ -139,7 +140,7 @@ def task_card(view: TaskView, now: datetime) -> str:
     text = texts.TASK_CARD.format(
         code=esc(t.code),
         title=esc(t.title),
-        status=texts.STATUS_LABELS[t.status],
+        status=status_label(t),
         assignee=user_label(view.assignee),
         due=format_due(t, now),
         series=esc(view.series.name) if view.series else texts.NO_SERIES,
@@ -152,12 +153,42 @@ def task_card(view: TaskView, now: datetime) -> str:
         text += texts.TASK_CARD_DESCRIPTION.format(description=esc(t.description))
     if view.brief is not None and view.brief.attachments:
         text += texts.TASK_CARD_BRIEF.format(count=fa_digits(len(view.brief.attachments)))
+    if view.latest_version:
+        text += texts.TASK_CARD_VERSION.format(version=fa_digits(view.latest_version))
     if view.last_event is not None:
         text += texts.TASK_CARD_LAST_EVENT.format(
             event=texts.AUDIT_LABELS.get(view.last_event.action, esc(view.last_event.action)),
             actor=user_label(view.last_actor),
             when=format_jalali_datetime(view.last_event.at),
         )
+    return text
+
+
+def status_label(task: Task) -> str:
+    label = texts.STATUS_LABELS[task.status]
+    if task.status == TaskStatus.IN_REVIEW and task.review_stage is not None:
+        return texts.STATUS_WITH_STAGE.format(status=label, stage=texts.STAGE_LABELS[str(task.review_stage)])
+    return label
+
+
+def review_card(view: ReviewView, now: datetime) -> str:
+    t, sub = view.task, view.submission
+    text = texts.REVIEW_CARD.format(
+        code=esc(t.code),
+        title=esc(t.title),
+        assignee=user_label(view.assignee),
+        version=fa_digits(sub.version),
+        rounds=fa_digits(t.revision_round),
+        stage=texts.STAGE_LABELS[str(view.stage)],
+        due=format_due(t, now),
+        series=esc(view.series.name) if view.series else texts.NO_SERIES,
+    )
+    if sub.note:
+        text += texts.REVIEW_CARD_NOTE.format(note=esc(sub.note))
+    if sub.links:
+        text += texts.REVIEW_CARD_LINKS.format(links="\n".join(esc(link) for link in sub.links))
+    if sub.attachments:
+        text += texts.REVIEW_CARD_FILES.format(count=fa_digits(len(sub.attachments)))
     return text
 
 

@@ -38,7 +38,7 @@ from eventum_hq.bot.keyboards.tasks import (
     skip_description_keyboard,
     time_keyboard,
 )
-from eventum_hq.bot.states import PURPOSE_DUE, PURPOSE_NEW, DateInput, NewTaskFlow
+from eventum_hq.bot.states import PURPOSE_DELEGATION, PURPOSE_DUE, PURPOSE_NEW, DateInput, NewTaskFlow
 from eventum_hq.bot.task_ui import FREE_TEXT, reply, send_card
 from eventum_hq.core.errors import (
     InvalidTransition,
@@ -60,6 +60,7 @@ from eventum_hq.core.jalali import (
 from eventum_hq.core.timeutil import Clock
 from eventum_hq.models import ApprovalChain, Capability, User
 from eventum_hq.services.permissions import has_capability
+from eventum_hq.services.delegations import DelegationService
 from eventum_hq.services.tasks import DESCRIPTION_MAX, TITLE_MAX, NewTask, TaskService
 
 router = Router(name="task_create")
@@ -176,7 +177,7 @@ async def on_quick_date(query: CallbackQuery, callback_data: DateCb, state: FSMC
 @router.message(DateInput.date, FREE_TEXT)
 async def on_manual_date(
     message: Message, state: FSMContext, clock: Clock, tasks: TaskService, current_user: User,
-    admin_views: AdminViews,
+    admin_views: AdminViews, delegations: DelegationService,
 ) -> None:
     try:
         parsed = parse_date_input(message.text or "", tehran_today(clock.now()))
@@ -186,7 +187,7 @@ async def on_manual_date(
     if parsed.time is None:
         await _ask_time(message, state, parsed.date)
         return
-    await _finish_date(message, state, parsed.date, parsed.time, clock, tasks, current_user, admin_views)
+    await _finish_date(message, state, parsed.date, parsed.time, clock, tasks, current_user, admin_views, delegations)
 
 
 async def _ask_time(event: Message | CallbackQuery, state: FSMContext, day: date) -> None:
@@ -198,7 +199,7 @@ async def _ask_time(event: Message | CallbackQuery, state: FSMContext, day: date
 @router.callback_query(DateInput.time, DateCb.filter(F.kind == DateKind.TIME))
 async def on_time_button(
     query: CallbackQuery, callback_data: DateCb, state: FSMContext, clock: Clock, tasks: TaskService,
-    current_user: User, admin_views: AdminViews,
+    current_user: User, admin_views: AdminViews, delegations: DelegationService,
 ) -> None:
     value = callback_data.value
     try:
@@ -207,14 +208,14 @@ async def on_time_button(
         await query.answer(texts.STALE_BUTTON, show_alert=True)
         return
     day = date.fromisoformat((await state.get_data())["due_date"])
-    await _finish_date(query, state, day, at, clock, tasks, current_user, admin_views)
+    await _finish_date(query, state, day, at, clock, tasks, current_user, admin_views, delegations)
     await query.answer()
 
 
 @router.message(DateInput.time, FREE_TEXT)
 async def on_manual_time(
     message: Message, state: FSMContext, clock: Clock, tasks: TaskService, current_user: User,
-    admin_views: AdminViews,
+    admin_views: AdminViews, delegations: DelegationService,
 ) -> None:
     try:
         at = parse_time_input(message.text or "")
@@ -222,12 +223,12 @@ async def on_manual_time(
         await message.answer(texts.INVALID_TIME)
         return
     day = date.fromisoformat((await state.get_data())["due_date"])
-    await _finish_date(message, state, day, at, clock, tasks, current_user, admin_views)
+    await _finish_date(message, state, day, at, clock, tasks, current_user, admin_views, delegations)
 
 
 async def _finish_date(
     event: Message | CallbackQuery, state: FSMContext, day: date, at: time, clock: Clock,
-    tasks: TaskService, user: User, admin_views: AdminViews,
+    tasks: TaskService, user: User, admin_views: AdminViews, delegations: DelegationService,
 ) -> None:
     due = tehran_to_utc(day, at)
     if due < clock.now():
@@ -237,16 +238,16 @@ async def _finish_date(
             event, texts.DUE_PAST_CONFIRM.format(due=format_jalali_datetime(due)), past_confirm_keyboard()
         )
         return
-    await _date_done(event, state, due, clock, tasks, user, admin_views)
+    await _date_done(event, state, due, clock, tasks, user, admin_views, delegations)
 
 
 @router.callback_query(DateInput.past_confirm, DateCb.filter(F.kind == DateKind.PAST_YES))
 async def on_past_yes(
     query: CallbackQuery, state: FSMContext, clock: Clock, tasks: TaskService, current_user: User,
-    admin_views: AdminViews,
+    admin_views: AdminViews, delegations: DelegationService,
 ) -> None:
     due = datetime.fromisoformat((await state.get_data())["due_at"])
-    await _date_done(query, state, due, clock, tasks, current_user, admin_views)
+    await _date_done(query, state, due, clock, tasks, current_user, admin_views, delegations)
     await query.answer()
 
 
@@ -259,9 +260,24 @@ async def on_past_no(query: CallbackQuery, state: FSMContext) -> None:
 
 async def _date_done(
     event: Message | CallbackQuery, state: FSMContext, due: datetime, clock: Clock,
-    tasks: TaskService, user: User, admin_views: AdminViews,
+    tasks: TaskService, user: User, admin_views: AdminViews, delegations: DelegationService,
 ) -> None:
     data = await state.get_data()
+    if data.get("date_purpose") == PURPOSE_DELEGATION:
+        await state.clear()
+        try:
+            delegation = await delegations.create(user, int(data["delegate_id"]), due)
+        except PermissionDenied:
+            await reply(event, texts.PERMISSION_DENIED)
+            return
+        except ValidationFailed as exc:
+            await reply(event, texts.VALIDATION_MESSAGES.get(exc.code, texts.GENERIC_ERROR))
+            return
+        current = await delegations.current()
+        name = user_label(current.to_user) if current is not None else ""
+        await reply(event, texts.DELEGATION_CREATED.format(
+            ends=format_jalali_datetime(delegation.ends_at), name=name))
+        return
     if data.get("date_purpose") == PURPOSE_DUE:
         await state.clear()
         task_id = int(data["due_task_id"])

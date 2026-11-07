@@ -23,8 +23,10 @@ from aiogram.types import CallbackQuery, Message, TelegramObject, Update
 from eventum_hq.bot import texts
 
 from eventum_hq.bot.keyboards.access import JOIN_PREFIX
+from eventum_hq.bot.keyboards.main_menu import AdminViews
 from eventum_hq.bot.outbox import OutboxSender
 from eventum_hq.core.timeutil import Clock
+from eventum_hq.services.delegations import DelegationService
 from eventum_hq.services.users import UserService
 
 log = logging.getLogger(__name__)
@@ -58,8 +60,15 @@ def should_leave_chat(*, chat_type: str, chat_id: int, team_group_id: int | None
 
 
 class AccessMiddleware(BaseMiddleware):
-    def __init__(self, users: UserService) -> None:
+    def __init__(
+        self,
+        users: UserService,
+        delegations: DelegationService | None = None,
+        views: AdminViews | None = None,
+    ) -> None:
         self._users = users
+        self._delegations = delegations
+        self._views = views
 
     async def __call__(self, handler: Handler, event: TelegramObject, data: dict[str, Any]) -> Any:
         assert isinstance(event, Update)
@@ -88,6 +97,11 @@ class AccessMiddleware(BaseMiddleware):
             return None
 
         data["current_user"] = current_user
+        if current_user is not None and self._delegations is not None and self._views is not None:
+            self._views.set_delegate(
+                current_user.telegram_id,
+                await self._delegations.is_active_delegate(current_user.id),
+            )
         return await handler(event, data)
 
 

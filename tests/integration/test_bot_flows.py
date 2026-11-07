@@ -11,7 +11,14 @@ from typing import Any
 import pytest
 from aiogram import Bot
 from aiogram.client.session.base import BaseSession
-from aiogram.methods import AnswerCallbackQuery, EditMessageText, SendMessage, TelegramMethod
+from aiogram.methods import (
+    AnswerCallbackQuery,
+    CopyMessage,
+    EditMessageText,
+    SendMessage,
+    TelegramMethod,
+)
+from aiogram.types import MessageId
 from sqlalchemy import select
 
 from eventum_hq.bot import texts
@@ -22,6 +29,9 @@ from eventum_hq.core.db import Database
 from eventum_hq.models import Role, Task, TaskStatus, User
 from eventum_hq.services.notifications import OutboxStore
 from eventum_hq.services.permissions import ROLE_DEFAULT_CAPABILITIES, MenuItem
+from eventum_hq.integrations.telegram_archive import TelegramArchive
+from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.reviews import ReviewService
 from eventum_hq.services.tasks import TaskService
 from eventum_hq.services.users import UserService
 from tests.conftest import OWNER_TG, FakeClock, add_user
@@ -36,6 +46,8 @@ class RecordingSession(BaseSession):
 
     async def make_request(self, bot: Bot, method: TelegramMethod[Any], timeout: int | None = None) -> Any:
         self.calls.append(method)
+        if isinstance(method, CopyMessage):
+            return MessageId(message_id=5000 + len(self.calls))
         return True
 
     async def stream_content(self, *args: Any, **kwargs: Any):  # type: ignore[no-untyped-def]
@@ -46,17 +58,28 @@ class RecordingSession(BaseSession):
         return None
 
 
+ARCHIVE = -1009999
+
+
 class Harness:
-    def __init__(self, db: Database, clock: FakeClock) -> None:
+    def __init__(self, db: Database, clock: FakeClock, archive_channel_id: int | None = ARCHIVE) -> None:
         self.db = db
         self.clock = clock
         self.session = RecordingSession()
         self.bot = Bot(token="42:TEST", session=self.session)
         users = UserService(db, clock, OWNER_TG)
         self.tasks = TaskService(db, clock)
-        outbox = OutboxSender(self.bot, OutboxStore(db, clock), users, self.tasks, clock)
-        settings = load_settings(_env_file=None, bot_token="42:TEST", owner_telegram_id=OWNER_TG)
-        self.dp = build_dispatcher(settings=settings, users=users, tasks=self.tasks, outbox=outbox, clock=clock)
+        self.reviews = ReviewService(db, clock)
+        self.delegations = DelegationService(db, clock)
+        self.archive = TelegramArchive(self.bot, archive_channel_id)
+        outbox = OutboxSender(self.bot, OutboxStore(db, clock), users, self.tasks, clock,
+                              self.reviews, self.archive)
+        settings = load_settings(_env_file=None, bot_token="42:TEST", owner_telegram_id=OWNER_TG,
+                                 archive_channel_id=archive_channel_id)
+        self.dp = build_dispatcher(
+            settings=settings, users=users, tasks=self.tasks, reviews=self.reviews,
+            delegations=self.delegations, archive=self.archive, outbox=outbox, clock=clock,
+        )
         self._n = 0
 
     def _ts(self) -> int:
@@ -107,9 +130,11 @@ class Harness:
 
 def _detach_routers() -> None:
     """aiogram routers are module singletons; free them so the next test can attach them."""
-    from eventum_hq.bot.routers import access, errors, groups, menu, start, task_create, tasks
+    from eventum_hq.bot.routers import (
+        access, deliver, errors, groups, menu, review, start, task_create, tasks, team,
+    )
 
-    for module in (access, errors, groups, menu, start, task_create, tasks):
+    for module in (access, deliver, errors, groups, menu, review, start, task_create, tasks, team):
         module.router._parent_router = None
 
 

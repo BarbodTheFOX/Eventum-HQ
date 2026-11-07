@@ -171,6 +171,10 @@ AUDIT_LABELS: dict[str, str] = {
     "task.cancelled": "لغو شد",
     "task.due_changed": "ددلاین تغییر کرد",
     "task.reassigned": "مسئول تغییر کرد",
+    "task.submitted": "تحویل شد",
+    "review.approved": "تأیید شد",
+    "review.changes_requested": "اصلاح خواسته شد",
+    "task.done": "انجام شد",
 }
 
 # ---- tasks: card ---------------------------------------------------------------
@@ -312,6 +316,12 @@ VALIDATION_MESSAGES: dict[str, str] = {
     "same_due": "ددلاین جدید با قبلی یکی است.",
     "same_assignee": "همین نفر الان مسئول است.",
     "estimate_invalid": "زمان تخمینی نامعتبر است.",
+    "delegation_end_past": "زمان پایان تفویض باید در آینده باشد.",
+    "delegate_invalid": "این نفر نمی‌تواند نمایندهٔ تفویض باشد.",
+    "notes_empty": "حداقل یک یادداشت (متن، ویس یا عکس) بفرستید.",
+    "note_too_long": "یادداشت حداکثر ۳۰۰۰ کاراکتر است.",
+    "submission_too_big": "تعداد فایل یا لینک بیش از حد است.",
+    "submission_empty": "حداقل یک فایل یا لینک بفرستید.",
 }
 
 # ---- tasks: notifications ------------------------------------------------------
@@ -320,3 +330,116 @@ NOTIFY_TASK_ASSIGNED = "📌 <b>تسک جدید برای شما</b>\n\n"
 NOTIFY_TASK_DUE_CHANGED = "📅 <b>ددلاین تسک شما تغییر کرد</b>\n\n"
 NOTIFY_TASK_UNASSIGNED = "↪️ تسک <b>{code}</b> «{title}» به نفر دیگری سپرده شد."
 NOTIFY_TASK_CANCELLED = "❌ تسک <b>{code}</b> «{title}» لغو شد."
+
+# ---- M2: delivery ----------------------------------------------------------------
+
+STAGE_LABELS = {"L1": "مرحلهٔ اول", "FINAL": "تأیید نهایی"}
+STATUS_WITH_STAGE = "{status} — {stage}"
+TASK_CARD_VERSION = "\n📦 آخرین نسخه: v{version}"
+
+BTN_SUBMIT = "📤 تحویل"
+BTN_MARK_DONE = "✅ انجام شد"
+BTN_FINISH = "🏁 انجام شد (بعد از آپلود)"
+BTN_SEND_FOR_REVIEW = "✅ ارسال برای بررسی"
+SUBMIT_PROMPT = (
+    "📤 <b>تحویل {code}</b>\n\n"
+    "فایل‌ها (ویدیو، عکس، فایل، صدا، ویس) یا لینک‌ها را بفرستید. "
+    "می‌توانید یک یادداشت متنی هم بنویسید.\n"
+    "در آخر «✅ ارسال برای بررسی» را بزنید."
+)
+SUBMIT_COLLECTED = "دریافت شد ✅ — تا الان: {files} فایل، {links} لینک{note}"
+SUBMIT_COLLECTED_NOTE = "، با یادداشت"
+SUBMIT_EMPTY = "حداقل یک فایل یا لینک بفرستید."
+SUBMIT_UNSUPPORTED = "این نوع پیام قابل تحویل نیست. فایل، عکس، ویدیو، صدا، ویس یا لینک بفرستید."
+SUBMIT_DONE = "✅ نسخهٔ v{version} از {code} برای بررسی ارسال شد."
+ARCHIVE_NOT_CONFIGURED = (
+    "⚠️ کانال آرشیو هنوز تنظیم نشده، پس فایل قابل تحویل نیست.\n"
+    "به مدیر سیستم (باربد) خبر بدهید. تحویل فقط با لینک فعلاً ممکن است."
+)
+ARCHIVE_COPY_FAILED = (
+    "⚠️ کپی فایل در کانال آرشیو ممکن نشد. مطمئن شوید ربات در کانال آرشیو ادمین است و دوباره امتحان کنید."
+)
+ARCHIVE_CAPTION = "#{code_tag} v{version} | {title} | {assignee} | {date}"
+DONE_OK = "🏁 تسک {code} انجام شد."
+
+# ---- M2: review ------------------------------------------------------------------
+
+REVIEW_CARD = (
+    "👀 <b>بررسی {code}</b> · {title}\n\n"
+    "مسئول: {assignee}\n"
+    "نسخه: v{version} · دور اصلاح: {rounds}\n"
+    "مرحله: {stage}\n"
+    "ددلاین: {due}\n"
+    "سری: {series}"
+)
+REVIEW_CARD_NOTE = "\n\n📝 یادداشت مسئول:\n{note}"
+REVIEW_CARD_LINKS = "\n\n🔗 لینک‌ها:\n{links}"
+REVIEW_CARD_FILES = "\n\n📎 {count} فایل (پایین همین پیام)"
+REVIEW_APPROVED_SUFFIX = "\n\n✅ <b>تأیید شد</b> توسط {actor}"
+REVIEW_CHANGES_SUFFIX = "\n\n✏️ <b>اصلاح خواسته شد</b> توسط {actor}"
+REVIEW_ALREADY_DONE = "این مورد قبلاً بررسی شده است."
+BTN_APPROVE = "✅ تأیید"
+BTN_REQUEST_CHANGES = "✏️ اصلاح لازم است"
+BTN_DETAILS = "📄 جزئیات و تاریخچه"
+NOTES_PROMPT = (
+    "✏️ <b>یادداشت اصلاح برای {code}</b>\n\n"
+    "یک یا چند پیام بفرستید: متن، ویس یا عکس. در آخر «✅ تمام» را بزنید."
+)
+NOTES_COLLECTED = "دریافت شد ✅ — {count} یادداشت"
+NOTES_EMPTY = "حداقل یک یادداشت (متن، ویس یا عکس) بفرستید."
+NOTES_UNSUPPORTED = "برای یادداشت متن، ویس، عکس یا فایل بفرستید."
+BTN_NOTES_DONE = "✅ تمام"
+CHANGES_SENT = "✏️ درخواست اصلاح برای {code} ارسال شد."
+APPROVED_OK = "✅ تأیید شد."
+QUEUE_L1_HEADER = "👀 <b>منتظر بررسی من</b> ({count})"
+QUEUE_FINAL_HEADER = "✅ <b>منتظر تأیید من</b> ({count})"
+QUEUE_EMPTY = "موردی در صف نیست. 🎉"
+
+# ---- M2: notifications ------------------------------------------------------------
+
+NOTIFY_REVIEW_REQUESTED = "🔔 <b>یک مورد منتظر بررسی شماست</b>\n\n"
+NOTIFY_L1_APPROVED = "👍 مرحلهٔ اول تسک <b>{code}</b> «{title}» تأیید شد و برای تأیید نهایی رفت."
+NOTIFY_APPROVED = (
+    "✅ <b>تسک {code} تأیید نهایی شد</b>\n\n"
+    "بعد از آپلود یا انتشار، روی کارت «🏁 انجام شد» را بزنید.\n\n"
+)
+NOTIFY_APPROVED_FINAL = "✅ <b>تسک {code} تأیید نهایی شد.</b>\n\n"
+NOTIFY_CHANGES = "✏️ <b>برای {code} اصلاح خواسته شد</b> (دور {round})\n\n"
+NOTIFY_CHANGES_NOTE = "📝 یادداشت:\n{note}\n\n"
+NOTIFY_CHANGES_FILES = "📎 {count} یادداشت صوتی/تصویری پایین همین پیام است.\n\n"
+NOTIFY_TASK_DONE = "🏁 تسک <b>{code}</b> «{title}» انجام شد."
+NOTIFY_DELEGATION_STARTED = (
+    "🔁 <b>تفویض تأیید نهایی شروع شد</b>\n\n"
+    "از: {from_name}\nبه: {to_name}\nتا: {ends}"
+)
+NOTIFY_DELEGATION_REVOKED = "⛔️ <b>تفویض تأیید نهایی لغو شد</b>\n\nاز: {from_name}\nبه: {to_name}"
+
+# ---- M2: team menu and delegation ----------------------------------------------------
+
+TEAM_MENU = "👥 <b>تیم</b>\n\n🔁 تفویض تأیید نهایی: {delegation}"
+TEAM_NO_DELEGATION = "فعال نیست"
+TEAM_DELEGATION_ACTIVE = "{to_name} تا {ends}"
+TEAM_MORE_SOON = "\n\nمدیریت کاربران، نقش‌ها و ظرفیت هفتگی در نسخه‌های بعدی اضافه می‌شود."
+BTN_NEW_DELEGATION = "🔁 تفویض جدید"
+BTN_REVOKE_DELEGATION = "⛔️ لغو تفویض"
+DELEGATION_PICK = "🔁 تأیید نهایی به چه کسی تفویض شود؟"
+DELEGATION_NO_CANDIDATES = "کسی با دسترسی «بررسی مرحلهٔ اول» نیست."
+DELEGATION_END_PROMPT = "📅 تفویض تا کی باشد؟\n" + "یکی از دکمه‌ها را بزنید یا تاریخ را بنویسید، مثلاً <code>1405/08/25 18:00</code>."
+DELEGATION_CREATED = "✅ تأیید نهایی تا {ends} به {name} تفویض شد."
+DELEGATION_REVOKED = "⛔️ تفویض لغو شد."
+DELEGATION_ALREADY_ENDED = "این تفویض قبلاً تمام یا لغو شده است."
+
+# ---- channel / group id helper -----------------------------------------------------
+
+CHANNEL_ID_HELP = (
+    "📢 ربات به کانال «{title}» اضافه شد.\n"
+    "شناسهٔ این کانال: <code>{chat_id}</code>\n\n"
+    "اگر این کانال آرشیو است، این عدد را جلوی <code>ARCHIVE_CHANNEL_ID=</code> در فایل .env بگذارید "
+    "و ربات را دوباره اجرا کنید. ربات باید در کانال <b>ادمین</b> باشد."
+)
+GROUP_ID_HELP = (
+    "👥 ربات به گروه «{title}» اضافه شد.\n"
+    "شناسهٔ این گروه: <code>{chat_id}</code>\n\n"
+    "اگر این گروه تیم است، این عدد را جلوی <code>TEAM_GROUP_ID=</code> در فایل .env بگذارید "
+    "و ربات را دوباره اجرا کنید. بعد از آن، ربات از هر گروه دیگری خارج می‌شود."
+)

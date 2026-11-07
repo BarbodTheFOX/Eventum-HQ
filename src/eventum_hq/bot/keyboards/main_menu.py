@@ -14,10 +14,23 @@ LABEL_TO_ITEM: dict[str, MenuItem] = {label: item for item, label in texts.MENU_
 
 
 class AdminViews:
-    """Which OWNERs currently use "admin view". In memory: resets to normal on restart."""
+    """Per-user menu state kept in memory (resets on restart): which OWNERs use
+    "admin view", and who is the active approval delegate right now (refreshed
+    from the DB on every update by AccessMiddleware).
+    """
 
     def __init__(self) -> None:
         self._on: set[int] = set()
+        self._delegates: set[int] = set()
+
+    def is_delegate(self, telegram_id: int) -> bool:
+        return telegram_id in self._delegates
+
+    def set_delegate(self, telegram_id: int, on: bool) -> None:
+        if on:
+            self._delegates.add(telegram_id)
+        else:
+            self._delegates.discard(telegram_id)
 
     def is_on(self, telegram_id: int) -> bool:
         return telegram_id in self._on
@@ -29,8 +42,9 @@ class AdminViews:
             self._on.discard(telegram_id)
 
 
-def main_menu(user: User, admin_view: bool = False) -> ReplyKeyboardMarkup:
-    labels = [texts.MENU_LABELS[item] for item in visible_menu_items(user, admin_view=admin_view)]
+def main_menu(user: User, admin_view: bool = False, is_delegate: bool = False) -> ReplyKeyboardMarkup:
+    items = visible_menu_items(user, admin_view=admin_view, is_delegate=is_delegate)
+    labels = [texts.MENU_LABELS[item] for item in items]
     rows = [
         [KeyboardButton(text=label) for label in labels[i : i + BUTTONS_PER_ROW]]
         for i in range(0, len(labels), BUTTONS_PER_ROW)
@@ -44,4 +58,8 @@ def main_menu(user: User, admin_view: bool = False) -> ReplyKeyboardMarkup:
 
 
 def menu_for(user: User, views: AdminViews) -> ReplyKeyboardMarkup:
-    return main_menu(user, admin_view=views.is_on(user.telegram_id))
+    return main_menu(
+        user,
+        admin_view=views.is_on(user.telegram_id),
+        is_delegate=views.is_delegate(user.telegram_id),
+    )

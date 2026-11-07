@@ -30,6 +30,8 @@ from eventum_hq.models.enums import (
     AccessStatus,
     ApprovalChain,
     NotificationStatus,
+    OutputType,
+    ReviewDecision,
     ReviewStage,
     Role,
     SeriesKind,
@@ -177,3 +179,81 @@ class TaskInput(IdMixin, TimestampMixin, Base):
         ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     provided_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class Submission(IdMixin, TimestampMixin, Base):
+    """One delivery of a task = one version (v1, v2, …) — handoff §4.7."""
+
+    __tablename__ = "submissions"
+    __table_args__ = (UniqueConstraint("task_id", "version"),)
+
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    submitted_by: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # [{file_id, file_unique_id, type, archive_message_id, size}]
+    attachments: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    links: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    submitted_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class Review(IdMixin, TimestampMixin, Base):
+    """A reviewer's decision on one submission at one stage — handoff §4.8."""
+
+    __tablename__ = "reviews"
+
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    stage: Mapped[ReviewStage] = mapped_column(enum_column(ReviewStage), nullable=False)
+    reviewer_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    decision: Mapped[ReviewDecision] = mapped_column(enum_column(ReviewDecision), nullable=False)
+    note_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note_attachments: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, nullable=False, default=list
+    )
+    delegated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    decided_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class Output(IdMixin, TimestampMixin, Base):
+    """Final approved deliverable in the library. ``content_item_id`` FK comes in M3."""
+
+    __tablename__ = "outputs"
+    __table_args__ = (Index(None, "approved_at"),)
+
+    task_id: Mapped[int] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("submissions.id", ondelete="RESTRICT"), nullable=False
+    )
+    content_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_type: Mapped[OutputType] = mapped_column(enum_column(OutputType), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    series_id: Mapped[int | None] = mapped_column(
+        ForeignKey("series.id", ondelete="RESTRICT"), nullable=True
+    )
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    approved_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    search_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+
+class Delegation(IdMixin, TimestampMixin, Base):
+    """Temporary hand-over of final approval (F7, handoff §4.4)."""
+
+    __tablename__ = "delegations"
+
+    from_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    to_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    starts_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
