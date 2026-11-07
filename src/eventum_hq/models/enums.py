@@ -41,6 +41,22 @@ class SeriesKind(StrEnum):
     OTHER = "OTHER"
 
 
+class ContentType(StrEnum):
+    REEL = "REEL"
+
+
+class ContentSubtype(StrEnum):
+    NORMAL = "NORMAL"
+    TRIAL = "TRIAL"
+
+
+class ContentStatus(StrEnum):
+    IN_PRODUCTION = "IN_PRODUCTION"
+    READY_TO_PUBLISH = "READY_TO_PUBLISH"
+    PUBLISHED = "PUBLISHED"
+    CANCELLED = "CANCELLED"
+
+
 class TaskKind(StrEnum):
     EDIT = "EDIT"
     COVER = "COVER"

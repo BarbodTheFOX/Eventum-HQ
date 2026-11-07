@@ -1,6 +1,7 @@
 from eventum_hq.models.base import Base
 from eventum_hq.models.entities import (
     AuditEvent,
+    ContentItem,
     Delegation,
     Notification,
     Output,
@@ -16,6 +17,9 @@ from eventum_hq.models.enums import (
     AccessStatus,
     ApprovalChain,
     Capability,
+    ContentStatus,
+    ContentSubtype,
+    ContentType,
     NotificationStatus,
     OutputType,
     ReviewDecision,
@@ -33,6 +37,10 @@ __all__ = [
     "AuditEvent",
     "Base",
     "Capability",
+    "ContentItem",
+    "ContentStatus",
+    "ContentSubtype",
+    "ContentType",
     "Delegation",
     "Notification",
     "NotificationStatus",

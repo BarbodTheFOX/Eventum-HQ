@@ -28,6 +28,7 @@ from eventum_hq.models import (
     ApprovalChain,
     AuditEvent,
     Capability,
+    ContentItem,
     Series,
     Task,
     TaskInput,
@@ -37,6 +38,7 @@ from eventum_hq.models import (
     User,
 )
 from eventum_hq.repositories import audit as audit_repo
+from eventum_hq.repositories import content as content_repo
 from eventum_hq.repositories import reviews as reviews_repo
 from eventum_hq.repositories import series as series_repo
 from eventum_hq.repositories import tasks as tasks_repo
@@ -89,6 +91,8 @@ def deadline_state(task: Task, now: datetime) -> DeadlineState:
         or task.first_submitted_at is not None
     ):
         return DeadlineState.NONE
+    if task.status == TaskStatus.BLOCKED:  # waiting for input: someone else's delay (§4.5)
+        return DeadlineState.AT_RISK if task.due_at < now + AT_RISK_WINDOW else DeadlineState.OK
     if task.due_at < now:
         return DeadlineState.OVERDUE
     if task.due_at < now + AT_RISK_WINDOW:
@@ -133,6 +137,9 @@ class TaskView:
     last_actor: User | None
     can_start: bool
     can_manage: bool
+    inputs: tuple[TaskInput, ...] = ()
+    content_item: ContentItem | None = None
+    can_send_photos: bool = False  # 🖼 cover photos (edit assignee, cover still BLOCKED)
     can_submit: bool = False  # 📤 deliver for review
     can_mark_done: bool = False  # ✅ done (chain NONE)
     can_finish: bool = False  # 🏁 done after approval (v1.2)
@@ -263,6 +270,12 @@ class TaskService:
             is_assignee = task.assignee_id == fresh.id
             needs_review = task.approval_chain != ApprovalChain.NONE
             latest_version = await reviews_repo.max_version(session, task.id)
+            inputs = tuple(await tasks_repo.inputs_of(session, task.id))
+            item = await content_repo.get_item(session, task.content_item_id) if task.content_item_id else None
+            can_send_photos = False
+            if item is not None and task.kind == TaskKind.EDIT and is_assignee:
+                cover = await content_repo.task_of_kind(session, item.id, TaskKind.COVER)
+                can_send_photos = cover is not None and cover.status == TaskStatus.BLOCKED
             return TaskView(
                 task=task,
                 assignee=people[task.assignee_id],
@@ -283,6 +296,9 @@ class TaskService:
                 can_finish=task.status == TaskStatus.APPROVED
                 and (is_assignee or can_manage_task(fresh, task)),
                 latest_version=latest_version,
+                inputs=inputs,
+                content_item=item,
+                can_send_photos=can_send_photos,
             )
 
     async def list_my(self, viewer: User) -> list[TaskRow]:
@@ -302,11 +318,15 @@ class TaskService:
             if task_filter == TaskFilter.OPEN:
                 tasks = await tasks_repo.list_open(session)
             elif task_filter == TaskFilter.OVERDUE:
-                tasks = await tasks_repo.list_open(session, not_submitted=True, due_before=now)
+                tasks = await tasks_repo.list_open(session, not_submitted=True, due_before=now,
+                                                   exclude_blocked=True)
             elif task_filter == TaskFilter.AT_RISK:
-                tasks = await tasks_repo.list_open(
-                    session, not_submitted=True, due_from=now, due_before=now + AT_RISK_WINDOW
-                )
+                tasks = [
+                    t for t in await tasks_repo.list_open(
+                        session, not_submitted=True, due_before=now + AT_RISK_WINDOW
+                    )
+                    if deadline_state(t, now) == DeadlineState.AT_RISK
+                ]
             elif task_filter == TaskFilter.BY_USER:
                 tasks = await tasks_repo.list_open(session, assignee_id=arg)
             else:
@@ -362,6 +382,8 @@ class TaskService:
             task = await self._load(session, task_id=task_id)
             if not can_manage_task(fresh, task):
                 raise PermissionDenied("task.cancel")
+            if task.content_item_id is not None:
+                raise ValidationFailed("reel_task_cancel")
             old = task.status
             ensure_transition(old, TaskStatus.CANCELLED)
             task.status = TaskStatus.CANCELLED

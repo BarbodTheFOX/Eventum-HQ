@@ -8,7 +8,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from eventum_hq.bot import texts
-from eventum_hq.bot.attachments import send_attachment
 from eventum_hq.bot.formatters import esc, history_text, task_list_text, user_label
 from eventum_hq.bot.keyboards.main_menu import AdminViews, menu_for
 from eventum_hq.bot.keyboards.tasks import (
@@ -26,10 +25,12 @@ from eventum_hq.bot.keyboards.tasks import (
     task_list_keyboard,
 )
 from eventum_hq.bot.routers.deliver import start_submit
+from eventum_hq.bot.routers.reels import start_photos
 from eventum_hq.bot.routers.task_create import start_due_edit, start_new_task
 from eventum_hq.bot.task_ui import edit_card, reply, send_card
 from eventum_hq.core.errors import InvalidTransition, NotFound, PermissionDenied, ValidationFailed
 from eventum_hq.core.timeutil import Clock
+from eventum_hq.integrations.telegram_archive import TelegramArchive
 from eventum_hq.models import Capability, User
 from eventum_hq.services.permissions import MenuItem, has_capability
 from eventum_hq.services.reviews import ReviewService
@@ -138,7 +139,7 @@ async def _list_header(scope: ListScope, arg: int, count: int, tasks: TaskServic
 @router.callback_query(TaskCb.filter())
 async def on_task_button(
     query: CallbackQuery, callback_data: TaskCb, state: FSMContext, bot: Bot,
-    current_user: User, tasks: TaskService, reviews: ReviewService, clock: Clock,
+    current_user: User, tasks: TaskService, reviews: ReviewService, archive: TelegramArchive, clock: Clock,
 ) -> None:
     action, task_id = callback_data.action, callback_data.task_id
     toast: str | None = None
@@ -193,9 +194,14 @@ async def on_task_button(
             await reply(query, history_text(task, entries), back_to_card_keyboard(task_id))
         elif action == TaskAction.BRIEF:
             view = await tasks.get_view(current_user, task_id=task_id)
-            if view.brief is not None:
-                for attachment in view.brief.attachments:
-                    await send_attachment(bot, query.from_user.id, attachment, caption=view.task.code)
+            for task_input in view.inputs:
+                for attachment in task_input.attachments:
+                    await archive.send_to(query.from_user.id, attachment, caption=view.task.code)
+        elif action == TaskAction.PHOTOS:
+            view = await tasks.get_view(current_user, task_id=task_id)
+            if not view.can_send_photos or view.content_item is None:
+                raise InvalidTransition(str(view.task.status), "PHOTOS")
+            await start_photos(query, state, task_id, view.content_item.code, view.content_item.title)
     except PermissionDenied:
         await query.answer(texts.PERMISSION_DENIED, show_alert=True)
         return

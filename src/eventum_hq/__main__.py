@@ -25,6 +25,7 @@ from eventum_hq.core.timeutil import SystemClock
 from eventum_hq.integrations.sync import NoopSync
 from eventum_hq.integrations.telegram_archive import TelegramArchive
 from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.reels import ReelService
 from eventum_hq.services.reviews import ReviewService
 from eventum_hq.services.notifications import OutboxStore
 from eventum_hq.services.tasks import TaskService
@@ -44,15 +45,16 @@ async def run(settings: Settings) -> None:
     tasks = TaskService(db, clock, sync)
     reviews = ReviewService(db, clock, sync)
     delegations = DelegationService(db, clock)
+    reels = ReelService(db, clock)
 
     bot = build_bot(settings)
     archive = TelegramArchive(bot, settings.archive_channel_id)
     if not archive.configured:
         log.warning("ARCHIVE_CHANNEL_ID is empty: file deliveries are disabled until it is set")
-    outbox = OutboxSender(bot, OutboxStore(db, clock), users, tasks, clock, reviews, archive)
+    outbox = OutboxSender(bot, OutboxStore(db, clock), users, tasks, clock, reviews, archive, reels)
     dp = build_dispatcher(
         settings=settings, users=users, tasks=tasks, reviews=reviews, delegations=delegations,
-        archive=archive, outbox=outbox, clock=clock,
+        reels=reels, archive=archive, outbox=outbox, clock=clock,
     )
     try:
         me = await bot.get_me()

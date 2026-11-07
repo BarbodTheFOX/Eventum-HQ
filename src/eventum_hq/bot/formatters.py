@@ -7,7 +7,8 @@ from html import escape
 
 from eventum_hq.bot import texts
 from eventum_hq.core.jalali import jalali_date_parts, jalali_parts
-from eventum_hq.models import Role, Task, TaskStatus, User
+from eventum_hq.models import Role, Task, TaskInputKind, TaskKind, TaskStatus, User
+from eventum_hq.services.reels import ReelView
 from eventum_hq.services.reviews import ReviewView
 from eventum_hq.services.tasks import (
     DeadlineState,
@@ -149,8 +150,28 @@ def task_card(view: TaskView, now: datetime) -> str:
         rounds=fa_digits(t.revision_round),
         creator=user_label(view.creator),
     )
+    item = view.content_item
+    if item is not None:
+        text += texts.TASK_CARD_REEL.format(
+            kind=texts.REEL_TASK_KIND_LABELS.get(str(t.kind), ""),
+            code=esc(item.code),
+            publish=format_jalali_datetime(item.planned_publish_at) if item.planned_publish_at else "—",
+        )
+        if t.kind == TaskKind.EDIT and item.photos_due_at is not None:
+            state = (texts.PHOTOS_NOT_SENT if item.photos_delivered_at is None
+                     else texts.PHOTOS_SENT_LATE if item.photos_late else texts.PHOTOS_SENT)
+            text += texts.TASK_CARD_PHOTOS_DUE.format(due=format_jalali_datetime(item.photos_due_at), state=state)
+    if t.status == TaskStatus.BLOCKED and t.blocked_reason:
+        text += texts.TASK_CARD_BLOCKED.format(reason=texts.BLOCKED_REASONS.get(t.blocked_reason, esc(t.blocked_reason)))
     if t.description:
         text += texts.TASK_CARD_DESCRIPTION.format(description=esc(t.description))
+    for task_input in view.inputs:
+        if task_input.kind == TaskInputKind.TIMECODES and task_input.text:
+            text += texts.INPUT_TIMECODES.format(text=esc(task_input.text))
+        elif task_input.kind == TaskInputKind.COVER_TEXT and task_input.text:
+            text += texts.INPUT_COVER_TEXT.format(text=esc(task_input.text))
+        elif task_input.kind == TaskInputKind.COVER_PHOTOS and task_input.attachments:
+            text += texts.INPUT_COVER_PHOTOS.format(count=fa_digits(len(task_input.attachments)))
     if view.brief is not None and view.brief.attachments:
         text += texts.TASK_CARD_BRIEF.format(count=fa_digits(len(view.brief.attachments)))
     if view.latest_version:
@@ -235,3 +256,40 @@ def history_text(task: Task, entries: list[HistoryEntry]) -> str:
 def _short(text: str, limit: int) -> str:
     text = " ".join(text.split())
     return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+# ---- reels ---------------------------------------------------------------------------
+
+
+def reel_card(view: ReelView) -> str:
+    item = view.item
+    if item.photos_delivered_at is not None:
+        photos = texts.REEL_PHOTOS_DONE_LATE if item.photos_late else texts.REEL_PHOTOS_DONE
+    elif item.photos_due_at is not None:
+        photos = texts.REEL_PHOTOS_PENDING.format(due=format_jalali_datetime(item.photos_due_at))
+    else:
+        photos = "—"
+    text = texts.REEL_CARD.format(
+        code=esc(item.code),
+        title=esc(item.title),
+        subtype=texts.SUBTYPE_LABELS.get(str(item.subtype), str(item.subtype)),
+        series=esc(view.series.name) if view.series else texts.NO_SERIES,
+        status=texts.CONTENT_STATUS_LABELS.get(str(item.status), str(item.status)),
+        publish=format_jalali_datetime(item.planned_publish_at) if item.planned_publish_at else "—",
+        photos=photos,
+        creator=user_label(view.creator),
+    )
+    for task in (view.edit_task, view.cover_task):
+        if task is not None:
+            text += texts.REEL_CARD_TASK.format(
+                kind=texts.REEL_TASK_KIND_LABELS.get(str(task.kind), ""),
+                code=esc(task.code),
+                status=status_label(task),
+                assignee=user_label(view.people.get(task.assignee_id)),
+            )
+    if item.published_at is not None:
+        text += texts.REEL_CARD_PUBLISHED.format(
+            when=format_jalali_datetime(item.published_at),
+            links="\n🔗 ".join(esc(link) for link in item.publish_links),
+        )
+    return text

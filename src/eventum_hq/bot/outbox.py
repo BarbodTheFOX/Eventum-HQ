@@ -30,21 +30,25 @@ from eventum_hq.bot.formatters import (
     esc,
     fa_digits,
     format_jalali_datetime,
+    reel_card,
     review_card,
     role_label,
     task_card,
 )
 from eventum_hq.bot.keyboards.access import access_request_keyboard
 from eventum_hq.bot.keyboards.main_menu import main_menu
+from eventum_hq.bot.keyboards.reels import reel_card_keyboard
 from eventum_hq.bot.keyboards.tasks import review_keyboard, task_card_keyboard
 from eventum_hq.core.timeutil import Clock
 from eventum_hq.integrations.telegram_archive import TelegramArchive
 from eventum_hq.models import Notification, TaskKind
 from eventum_hq.services import delegations as delegation_kinds
+from eventum_hq.services import reels as reel_kinds
 from eventum_hq.services import reviews as review_kinds
 from eventum_hq.services import tasks as task_kinds
 from eventum_hq.services import users as user_kinds
 from eventum_hq.services.notifications import OutboxStore
+from eventum_hq.services.reels import ReelService
 from eventum_hq.services.reviews import ReviewService
 from eventum_hq.services.tasks import TaskService
 from eventum_hq.services.users import UserService
@@ -79,6 +83,7 @@ class RenderContext:
     tasks: TaskService | None = None
     reviews: ReviewService | None = None
     clock: Clock | None = None
+    reels: ReelService | None = None
 
     def now(self) -> datetime:
         if self.clock is None:
@@ -155,6 +160,34 @@ async def render(row: Notification, ctx: RenderContext) -> Rendered:
     if kind == review_kinds.KIND_TASK_DONE:
         return Rendered(texts.NOTIFY_TASK_DONE.format(code=code, title=title))
 
+    # ---- reels
+    if kind == reel_kinds.KIND_REEL_PHOTOS_READY:
+        if ctx.tasks is None:
+            raise UnknownNotificationKind("no task service")
+        recipient = await _recipient(ctx, payload)
+        view = await ctx.tasks.get_view(recipient, task_id=int(payload["task_id"]))
+        photos = [a for i in view.inputs if str(i.kind) == "COVER_PHOTOS" for a in i.attachments]
+        prefix = texts.NOTIFY_REEL_PHOTOS_READY.format(reel_code=esc(payload.get("reel_code", "")))
+        return Rendered(prefix + task_card(view, ctx.now()), task_card_keyboard(view), photos)
+    if kind == reel_kinds.KIND_REEL_TASK_APPROVED:
+        return Rendered(texts.NOTIFY_REEL_TASK_APPROVED.format(
+            kind=texts.REEL_TASK_KIND_LABELS.get(payload.get("task_kind", ""), ""),
+            reel_code=esc(payload.get("reel_code", "")), title=title))
+    if kind == reel_kinds.KIND_REEL_CANCELLED:
+        return Rendered(texts.NOTIFY_REEL_CANCELLED.format(reel_code=esc(payload.get("reel_code", "")), title=title))
+    if kind in (reel_kinds.KIND_REEL_READY, reel_kinds.KIND_REEL_PUBLISHED):
+        if ctx.reels is None:
+            raise UnknownNotificationKind("no reel service")
+        recipient = await _recipient(ctx, payload)
+        view = await ctx.reels.view(recipient, item_id=int(payload["content_item_id"]))
+        if kind == reel_kinds.KIND_REEL_READY:
+            prefix = texts.NOTIFY_REEL_READY.format(reel_code=esc(view.item.code))
+            files = await ctx.reels.final_files(view.item.id)
+        else:
+            prefix = texts.NOTIFY_REEL_PUBLISHED.format(reel_code=esc(view.item.code))
+            files = []
+        return Rendered(prefix + reel_card(view), reel_card_keyboard(view), files)
+
     # ---- delegations
     if kind in (delegation_kinds.KIND_DELEGATION_STARTED, delegation_kinds.KIND_DELEGATION_REVOKED):
         fmt = (texts.NOTIFY_DELEGATION_STARTED if kind == delegation_kinds.KIND_DELEGATION_STARTED
@@ -195,10 +228,11 @@ class OutboxSender:
         clock: Clock | None = None,
         reviews: ReviewService | None = None,
         archive: TelegramArchive | None = None,
+        reels: ReelService | None = None,
     ) -> None:
         self._sender = sender
         self._store = store
-        self._ctx = RenderContext(users=users, tasks=tasks, reviews=reviews, clock=clock)
+        self._ctx = RenderContext(users=users, tasks=tasks, reviews=reviews, clock=clock, reels=reels)
         self._archive = archive
         self._lock = asyncio.Lock()  # never deliver the same row twice in parallel
 

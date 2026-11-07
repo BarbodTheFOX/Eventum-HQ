@@ -39,3 +39,33 @@ class ReviewNotesFlow(StatesGroup):
 
 
 PURPOSE_DELEGATION = "delegation"
+
+
+class NewReelFlow(StatesGroup):
+    title = State()
+    subtype = State()
+    edit_type = State()
+    series = State()
+    timecodes = State()
+    cover_text = State()
+    edit_assignee = State()
+    cover_assignee = State()
+    confirm = State()
+    estimate = State()  # changing one estimate from the confirm screen
+
+
+class PhotosFlow(StatesGroup):
+    """Cover photos from the edit assignee. Data: edit_task_id, reel_code, title, items."""
+
+    collect = State()
+
+
+class PublishFlow(StatesGroup):
+    """Publish links for a ready reel. Data: item_id, code, links."""
+
+    links = State()
+
+
+PURPOSE_REEL_PUBLISH = "reel_publish"
+PURPOSE_REEL_DEADLINE = "reel_deadline"
+PURPOSE_PUBLISHED_AT = "published_at"

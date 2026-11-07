@@ -2,10 +2,12 @@ from aiogram import Router
 
 from eventum_hq.bot.routers import (
     access,
+    dates,
     deliver,
     errors,
     groups,
     menu,
+    reels,
     review,
     start,
     task_create,
@@ -27,10 +29,12 @@ def build_root_router() -> Router:
         groups.router,
         start.router,
         access.router,
+        dates.router,
         task_create.router,
         deliver.router,
         review.router,
         team.router,
+        reels.router,
         tasks.router,
         menu.router,
     )

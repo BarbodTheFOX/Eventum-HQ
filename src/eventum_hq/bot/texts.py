@@ -175,6 +175,7 @@ AUDIT_LABELS: dict[str, str] = {
     "review.approved": "تأیید شد",
     "review.changes_requested": "اصلاح خواسته شد",
     "task.done": "انجام شد",
+    "task.unblocked": "عکس‌های کاور رسید",
 }
 
 # ---- tasks: card ---------------------------------------------------------------
@@ -196,7 +197,7 @@ TASK_CARD_LAST_EVENT = "\n\nآخرین رویداد: {event} — {actor}، {when
 DUE_WITH_DELTA = "{due} ({emoji}{delta})"
 
 BTN_START = "▶️ شروع کار"
-BTN_BRIEF = "📎 دریافت بریف"
+BTN_BRIEF = "📎 دریافت فایل‌های ورودی"
 BTN_CHANGE_DUE = "📅 تغییر ددلاین"
 BTN_REASSIGN = "👤 تغییر مسئول"
 BTN_CANCEL_TASK = "❌ لغو تسک"
@@ -316,6 +317,11 @@ VALIDATION_MESSAGES: dict[str, str] = {
     "same_due": "ددلاین جدید با قبلی یکی است.",
     "same_assignee": "همین نفر الان مسئول است.",
     "estimate_invalid": "زمان تخمینی نامعتبر است.",
+    "reel_task_cancel": "تسک‌های ریل فقط با «❌ لغو ریل» از کارت ریل لغو می‌شوند.",
+    "links_invalid": "لینک نامعتبر است. لینک باید با https:// شروع شود.",
+    "photos_empty": "حداقل یک عکس یا فایل بفرستید.",
+    "photos_after_edit": "ددلاین عکس‌ها نباید بعد از ددلاین ادیت باشد.",
+    "reel_inputs_missing": "تایم‌کدها و متن کاور لازم است.",
     "delegation_end_past": "زمان پایان تفویض باید در آینده باشد.",
     "delegate_invalid": "این نفر نمی‌تواند نمایندهٔ تفویض باشد.",
     "notes_empty": "حداقل یک یادداشت (متن، ویس یا عکس) بفرستید.",
@@ -443,3 +449,116 @@ GROUP_ID_HELP = (
     "اگر این گروه تیم است، این عدد را جلوی <code>TEAM_GROUP_ID=</code> در فایل .env بگذارید "
     "و ربات را دوباره اجرا کنید. بعد از آن، ربات از هر گروه دیگری خارج می‌شود."
 )
+
+# ---- M3: reels -----------------------------------------------------------------------
+
+SUBTYPE_LABELS = {"NORMAL": "🎞 ریل عادی", "TRIAL": "🧪 Trial"}
+CONTENT_STATUS_LABELS = {
+    "IN_PRODUCTION": "🛠 در حال تولید",
+    "READY_TO_PUBLISH": "🚀 آماده انتشار",
+    "PUBLISHED": "✅ منتشر شده",
+    "CANCELLED": "❌ لغوشده",
+}
+REEL_TASK_KIND_LABELS = {"EDIT": "🎬 ادیت", "COVER": "🖼 کاور"}
+BLOCKED_REASONS = {"waiting_cover_photos": "منتظر عکس‌های کاور از ادیتور"}
+INPUT_TIMECODES = "\n\n⏱ <b>تایم‌کدها:</b>\n{text}"
+INPUT_COVER_TEXT = "\n\n🖋 <b>متن کاور:</b>\n{text}"
+INPUT_COVER_PHOTOS = "\n🖼 عکس‌های کاور: {count} فایل"
+TASK_CARD_REEL = "\n{kind} ریل <b>{code}</b> · انتشار: {publish}"
+TASK_CARD_BLOCKED = "\n🔒 {reason}"
+TASK_CARD_PHOTOS_DUE = "\n🖼 عکس‌های کاور: تا {due} — {state}"
+PHOTOS_NOT_SENT = "⏳ ارسال‌نشده"
+PHOTOS_SENT = "✅ ارسال شد"
+PHOTOS_SENT_LATE = "✅ ارسال شد (با تأخیر)"
+BTN_INPUT_FILES = "📎 دریافت فایل‌های ورودی"
+BTN_SEND_COVER_PHOTOS = "🖼 ارسال عکس‌های کاور"
+
+NEW_REEL_TITLE = "➕ <b>ریل جدید</b>\n\nعنوان ریل را بنویسید:\n(برای لغو در هر مرحله: /cancel)"
+NEW_REEL_SUBTYPE = "نوع ریل؟"
+NEW_REEL_EDIT_TYPE = "نوع ادیت؟ (فقط برای زمان تخمینی)"
+BTN_EDIT_NORMAL = "نرمال"
+BTN_EDIT_MOTION = "با موشن"
+NEW_REEL_SERIES = "🗂 سری این ریل؟"
+DEFAULT_MARK = "⭐ "
+NEW_REEL_PUBLISH_PROMPT = (
+    "📅 زمان انتشار برنامه‌ریزی‌شده؟\n"
+    "یکی از دکمه‌ها را بزنید یا بنویسید، مثلاً <code>1405/08/20 20:00</code>."
+)
+NEW_REEL_TIMECODES = "⏱ تایم‌کدها را بفرستید (متن):"
+NEW_REEL_COVER_TEXT = "🖋 متن کاور را بفرستید:"
+NEW_REEL_EDIT_ASSIGNEE = "🎬 مسئول ادیت؟ (⭐ = پیش‌فرض)"
+NEW_REEL_COVER_ASSIGNEE = "🖼 مسئول کاور؟ (⭐ = پیش‌فرض)"
+NEW_REEL_CONFIRM = (
+    "🧾 <b>بررسی نهایی ریل</b>\n\n"
+    "عنوان: {title}\n"
+    "نوع: {subtype}\n"
+    "سری: {series}\n"
+    "انتشار: {publish}\n\n"
+    "🎬 ادیت: {editor} — ددلاین {edit_due} — {edit_est}\n"
+    "🖼 کاور: {designer} — ددلاین {cover_due} — {cover_est}\n"
+    "📸 عکس‌های کاور از ادیتور تا: {photos_due}\n\n"
+    "⏱ تایم‌کدها: {timecodes}\n"
+    "🖋 متن کاور: {cover_text}"
+)
+BTN_CREATE_REEL = "✅ ساخت ریل"
+BTN_CHANGE_DEADLINES = "📅 تغییر ددلاین‌ها"
+BTN_CHANGE_ESTIMATES = "⏱ تغییر زمان‌های تخمینی"
+BTN_BACK = "↩️ بازگشت"
+PICK_DEADLINE = "کدام ددلاین؟"
+PICK_ESTIMATE = "زمان تخمینی کدام؟"
+DEADLINE_KEY_LABELS = {"photos": "📸 عکس‌های کاور", "edit": "🎬 ادیت", "cover": "🖼 کاور"}
+DEADLINE_PROMPT = "📅 ددلاین جدید «{label}»؟\n" + "یکی از دکمه‌ها را بزنید یا تاریخ را بنویسید."
+ESTIMATE_PROMPT = "⏱ زمان تخمینی «{label}»؟\nیکی از دکمه‌ها را بزنید یا بنویسید، مثلاً <code>90</code>."
+REEL_CREATED = "✅ ریل <b>{code}</b> ساخته شد. مسئولان پیام گرفتند."
+REEL_TEXT_REQUIRED = "لطفاً متن بفرستید."
+
+REEL_CARD = (
+    "🎬 <b>{code}</b> · {title}\n\n"
+    "نوع: {subtype}\n"
+    "سری: {series}\n"
+    "وضعیت: {status}\n"
+    "انتشار برنامه‌ریزی‌شده: {publish}\n"
+    "🖼 عکس‌های کاور: {photos}\n"
+    "سازنده: {creator}"
+)
+REEL_CARD_TASK = "\n{kind}: <b>{code}</b> — {status} — {assignee}"
+REEL_CARD_PUBLISHED = "\n\n✅ منتشر شد: {when}\n🔗 {links}"
+REEL_PHOTOS_PENDING = "تا {due} — ⏳ ارسال‌نشده"
+REEL_PHOTOS_DONE = "✅ ارسال شد"
+REEL_PHOTOS_DONE_LATE = "✅ ارسال شد (با تأخیر)"
+BTN_OPEN_EDIT = "🎬 تسک ادیت"
+BTN_OPEN_COVER = "🖼 تسک کاور"
+BTN_PUBLISH = "🚀 ثبت انتشار"
+BTN_CANCEL_REEL = "❌ لغو ریل"
+CONFIRM_CANCEL_REEL = "\n\n⚠️ <b>این ریل و همهٔ تسک‌های بازش لغو شود؟</b>"
+REEL_CANCELLED_OK = "❌ ریل لغو شد."
+REEL_CODE_NOT_FOUND = "ریلی با کد {code} پیدا نشد."
+READY_HEADER = "🚀 <b>آماده انتشار</b> ({count})"
+READY_EMPTY = "ریلی آماده انتشار نیست."
+
+PHOTOS_PROMPT = (
+    "🖼 <b>عکس‌های کاور {code}</b>\n\n"
+    "یک یا چند عکس یا فایل بفرستید، بعد «✅ تمام» را بزنید."
+)
+PHOTOS_COLLECTED = "دریافت شد ✅ — {count} فایل"
+PHOTOS_EMPTY = "حداقل یک عکس یا فایل بفرستید."
+PHOTOS_DONE = "✅ عکس‌ها برای مسئول کاور فرستاده شد."
+ARCHIVE_PHOTOS_CAPTION = "#{code_tag} عکس کاور | {title} | {sender} | {date}"
+
+PUBLISH_PROMPT = (
+    "🚀 <b>ثبت انتشار {code}</b>\n\n"
+    "لینک‌های انتشار را بفرستید (اینستاگرام، یوتیوب، تلگرام؛ یک یا چند پیام).\n"
+    "بعد یکی از دکمه‌ها را بزنید."
+)
+PUBLISH_COLLECTED = "دریافت شد ✅ — {count} لینک"
+PUBLISH_NO_LINKS = "حداقل یک لینک بفرستید."
+BTN_PUBLISH_NOW = "✅ ثبت — همین الان منتشر شد"
+BTN_PUBLISH_OTHER_TIME = "📅 زمان دیگر"
+PUBLISH_TIME_PROMPT = "📅 کی منتشر شد؟\nیکی از دکمه‌ها را بزنید یا بنویسید، مثلاً <code>1405/08/20 20:00</code>."
+PUBLISHED_OK = "✅ انتشار {code} ثبت شد."
+
+NOTIFY_REEL_PHOTOS_READY = "🖼 <b>عکس‌های کاور ریل {reel_code} رسید.</b> می‌توانید کاور را شروع کنید.\n\n"
+NOTIFY_REEL_TASK_APPROVED = "✅ {kind} ریل <b>{reel_code}</b> «{title}» تأیید نهایی شد."
+NOTIFY_REEL_READY = "🚀 <b>ریل {reel_code} آماده انتشار است.</b>\n\n"
+NOTIFY_REEL_PUBLISHED = "✅ <b>ریل {reel_code} منتشر شد.</b>\n\n"
+NOTIFY_REEL_CANCELLED = "❌ ریل <b>{reel_code}</b> «{title}» لغو شد و تسک شما بسته شد."

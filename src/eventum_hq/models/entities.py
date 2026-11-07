@@ -29,6 +29,9 @@ from eventum_hq.models.base import Base, IdMixin, TimestampMixin, UTCDateTime, e
 from eventum_hq.models.enums import (
     AccessStatus,
     ApprovalChain,
+    ContentStatus,
+    ContentSubtype,
+    ContentType,
     NotificationStatus,
     OutputType,
     ReviewDecision,
@@ -116,11 +119,38 @@ class AuditEvent(IdMixin, TimestampMixin, Base):
     at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
+class ContentItem(IdMixin, TimestampMixin, Base):
+    """A content piece. v0: only reels (handoff §4.1, §4.5). Reel logic lives in services/reels.py."""
+
+    __tablename__ = "content_items"
+
+    code: Mapped[str] = mapped_column(String(16), unique=True, nullable=False)  # R-0001
+    type: Mapped[ContentType] = mapped_column(enum_column(ContentType), nullable=False)
+    subtype: Mapped[ContentSubtype] = mapped_column(enum_column(ContentSubtype), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    series_id: Mapped[int | None] = mapped_column(
+        ForeignKey("series.id", ondelete="RESTRICT"), nullable=True
+    )
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    planned_publish_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    status: Mapped[ContentStatus] = mapped_column(enum_column(ContentStatus), nullable=False)
+    photos_due_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    photos_delivered_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    photos_late: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    published_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    publish_links: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    external_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    external_synced_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
 class Task(IdMixin, TimestampMixin, Base):
     """One unit of work with one assignee (handoff §4.1, §7).
 
-    ``content_item_id`` and ``recurrence_id`` get their foreign keys in M3 / M5,
-    when ``content_items`` and ``recurrences`` exist.
+    ``recurrence_id`` gets its foreign key in M5, when ``recurrences`` exists.
     """
 
     __tablename__ = "tasks"
@@ -131,7 +161,9 @@ class Task(IdMixin, TimestampMixin, Base):
     )
 
     code: Mapped[str] = mapped_column(String(16), unique=True, nullable=False)  # T-0001
-    content_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    content_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("content_items.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     kind: Mapped[TaskKind] = mapped_column(enum_column(TaskKind), nullable=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -170,7 +202,9 @@ class TaskInput(IdMixin, TimestampMixin, Base):
     task_id: Mapped[int | None] = mapped_column(
         ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True, index=True
     )
-    content_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    content_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("content_items.id", ondelete="CASCADE"), nullable=True
+    )
     kind: Mapped[TaskInputKind] = mapped_column(enum_column(TaskInputKind), nullable=False)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     # [{file_id, file_unique_id, type, archive_message_id, size}]
@@ -221,7 +255,7 @@ class Review(IdMixin, TimestampMixin, Base):
 
 
 class Output(IdMixin, TimestampMixin, Base):
-    """Final approved deliverable in the library. ``content_item_id`` FK comes in M3."""
+    """Final approved deliverable in the library."""
 
     __tablename__ = "outputs"
     __table_args__ = (Index(None, "approved_at"),)
@@ -232,7 +266,9 @@ class Output(IdMixin, TimestampMixin, Base):
     submission_id: Mapped[int] = mapped_column(
         ForeignKey("submissions.id", ondelete="RESTRICT"), nullable=False
     )
-    content_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    content_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("content_items.id", ondelete="RESTRICT"), nullable=True
+    )
     output_type: Mapped[OutputType] = mapped_column(enum_column(OutputType), nullable=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     series_id: Mapped[int | None] = mapped_column(

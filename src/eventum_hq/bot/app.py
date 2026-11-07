@@ -22,6 +22,7 @@ from eventum_hq.core.config import Settings
 from eventum_hq.core.timeutil import Clock
 from eventum_hq.integrations.telegram_archive import TelegramArchive
 from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.reels import ReelService
 from eventum_hq.services.reviews import ReviewService
 from eventum_hq.services.tasks import TaskService
 from eventum_hq.services.users import UserService
@@ -43,6 +44,7 @@ def build_dispatcher(
     tasks: TaskService,
     reviews: ReviewService,
     delegations: DelegationService,
+    reels: ReelService,
     archive: TelegramArchive,
     outbox: OutboxSender,
     clock: Clock,
@@ -55,6 +57,7 @@ def build_dispatcher(
         tasks=tasks,
         reviews=reviews,
         delegations=delegations,
+        reels=reels,
         archive=archive,
         outbox=outbox,
         clock=clock,

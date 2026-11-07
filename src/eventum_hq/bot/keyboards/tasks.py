@@ -33,6 +33,7 @@ class TaskAction(StrEnum):
     BRIEF = "b"
     SUBMIT = "sub"
     DONE = "done"
+    PHOTOS = "ph"
 
 
 class TaskCb(CallbackData, prefix="t"):
@@ -117,7 +118,9 @@ def task_card_keyboard(view: TaskView) -> InlineKeyboardMarkup:
     if view.can_mark_done or view.can_finish:
         label = texts.BTN_FINISH if view.can_finish else texts.BTN_MARK_DONE
         rows.append([_btn(label, TaskCb(action=TaskAction.DONE, task_id=tid))])
-    if view.brief is not None and view.brief.attachments:
+    if view.can_send_photos:
+        rows.append([_btn(texts.BTN_SEND_COVER_PHOTOS, TaskCb(action=TaskAction.PHOTOS, task_id=tid))])
+    if any(i.attachments for i in view.inputs):
         rows.append([_btn(texts.BTN_BRIEF, TaskCb(action=TaskAction.BRIEF, task_id=tid))])
     if view.can_manage:
         rows.append(
@@ -126,7 +129,8 @@ def task_card_keyboard(view: TaskView) -> InlineKeyboardMarkup:
                 _btn(texts.BTN_REASSIGN, TaskCb(action=TaskAction.REASSIGN, task_id=tid)),
             ]
         )
-        rows.append([_btn(texts.BTN_CANCEL_TASK, TaskCb(action=TaskAction.CANCEL_ASK, task_id=tid))])
+        if view.content_item is None:  # reel tasks are cancelled with their reel
+            rows.append([_btn(texts.BTN_CANCEL_TASK, TaskCb(action=TaskAction.CANCEL_ASK, task_id=tid))])
     rows.append([_btn(texts.BTN_HISTORY, TaskCb(action=TaskAction.HISTORY, task_id=tid))])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

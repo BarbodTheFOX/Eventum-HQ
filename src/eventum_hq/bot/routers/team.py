@@ -5,6 +5,9 @@ Users, roles, weekly capacity and offboarding are added in later milestones.
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Any
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -16,12 +19,12 @@ from eventum_hq.bot.keyboards.tasks import (
     TeamAction,
     TeamCb,
     delegate_pick_keyboard,
-    quick_date_keyboard,
     team_keyboard,
 )
-from eventum_hq.bot.states import PURPOSE_DELEGATION, DateInput
+from eventum_hq.bot.routers.dates import on_date_chosen, start_date_input
+from eventum_hq.bot.states import PURPOSE_DELEGATION
 from eventum_hq.bot.task_ui import reply
-from eventum_hq.core.errors import AlreadyDecided, NotFound, PermissionDenied
+from eventum_hq.core.errors import AlreadyDecided, NotFound, PermissionDenied, ValidationFailed
 from eventum_hq.models import Capability, User
 from eventum_hq.services.delegations import DelegationService
 from eventum_hq.services.permissions import MenuItem, can_use_menu_item, has_capability
@@ -74,9 +77,8 @@ async def on_team(query: CallbackQuery, callback_data: TeamCb, state: FSMContext
         await reply(query, texts.DELEGATION_PICK, delegate_pick_keyboard(candidates))
     elif action == TeamAction.PICK_DELEGATE:
         await state.clear()
-        await state.update_data(date_purpose=PURPOSE_DELEGATION, delegate_id=callback_data.arg)
-        await state.set_state(DateInput.date)
-        await reply(query, texts.DELEGATION_END_PROMPT, quick_date_keyboard())
+        await start_date_input(query, state, PURPOSE_DELEGATION, texts.DELEGATION_END_PROMPT,
+                               delegate_id=callback_data.arg)
     elif action == TeamAction.REVOKE:
         try:
             await delegations.revoke(current_user, callback_data.arg)
@@ -90,3 +92,22 @@ async def on_team(query: CallbackQuery, callback_data: TeamCb, state: FSMContext
         await reply(query, texts.DELEGATION_REVOKED + "\n\n" + text,
                     team_keyboard(can_delegate=can_delegate, active_delegation_id=active_id))
     await query.answer()
+
+
+@on_date_chosen(PURPOSE_DELEGATION)
+async def _delegation_end_chosen(event: Message | CallbackQuery, state: FSMContext, ends: datetime,
+                                 data: dict[str, Any]) -> None:
+    flow = await state.get_data()
+    await state.clear()
+    delegations: DelegationService = data["delegations"]
+    try:
+        delegation = await delegations.create(data["current_user"], int(flow["delegate_id"]), ends)
+    except PermissionDenied:
+        await reply(event, texts.PERMISSION_DENIED)
+        return
+    except ValidationFailed as exc:
+        await reply(event, texts.VALIDATION_MESSAGES.get(exc.code, texts.GENERIC_ERROR))
+        return
+    current = await delegations.current()
+    name = user_label(current.to_user) if current is not None else ""
+    await reply(event, texts.DELEGATION_CREATED.format(ends=format_jalali_datetime(delegation.ends_at), name=name))

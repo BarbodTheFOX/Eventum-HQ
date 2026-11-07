@@ -51,7 +51,7 @@ from eventum_hq.repositories import reviews as reviews_repo
 from eventum_hq.repositories import series as series_repo
 from eventum_hq.repositories import tasks as tasks_repo
 from eventum_hq.repositories import users as users_repo
-from eventum_hq.services import audit
+from eventum_hq.services import audit, reels
 from eventum_hq.services.delegations import active_delegate_id
 from eventum_hq.services.notifications import enqueue
 from eventum_hq.services.permissions import (
@@ -317,6 +317,8 @@ class ReviewService:
                 await self._create_output(session, task, submission, assignee, now)
                 action = "review.approved"
                 await self._notify(session, assignee, fresh, KIND_REVIEW_APPROVED, task, now)
+                if task.content_item_id is not None:
+                    await reels.on_task_finalized(session, task, fresh, now)
 
             await audit.record(
                 session, actor_id=fresh.id, action=action, entity_type=ENTITY, entity_id=task.id,

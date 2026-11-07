@@ -105,5 +105,6 @@ async def get_delegation(session: AsyncSession, delegation_id: int) -> Delegatio
 
 
 async def setting(session: AsyncSession, key: str, default: Any = None) -> Any:
-    row = await session.get(Setting, key)
-    return default if row is None else row.value
+    from eventum_hq.repositories.content import setting as _setting
+
+    return await _setting(session, key, default)
