@@ -23,7 +23,9 @@ from eventum_hq.core.config import Settings
 from eventum_hq.core.timeutil import Clock
 from eventum_hq.integrations.telegram_archive import TelegramArchive
 from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.recurrences import RecurrenceService
 from eventum_hq.services.reels import ReelService
+from eventum_hq.services.reports import ReportService
 from eventum_hq.services.reviews import ReviewService
 from eventum_hq.services.tasks import TaskService
 from eventum_hq.services.users import UserService
@@ -51,6 +53,8 @@ def build_dispatcher(
     archive: TelegramArchive,
     outbox: OutboxSender,
     clock: Clock,
+    recurrences: RecurrenceService,
+    reports: ReportService,
 ) -> Dispatcher:
     admin_views = AdminViews()
     dp = Dispatcher(
@@ -61,6 +65,8 @@ def build_dispatcher(
         reviews=reviews,
         delegations=delegations,
         reels=reels,
+        recurrences=recurrences,
+        reports=reports,
         archive=archive,
         outbox=outbox,
         clock=clock,

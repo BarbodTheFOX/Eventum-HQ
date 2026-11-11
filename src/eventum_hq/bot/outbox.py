@@ -1,7 +1,8 @@
 """Delivers outbox rows written by services.
 
 Urgent rows are delivered right after each update (``OutboxFlushMiddleware``)
-and once at startup. The periodic tick, quiet hours and backoff retries come in M5.
+and once at startup; the 60-second tick (M5) delivers every due row. Quiet hours
+and retry backoff are decided by :class:`OutboxStore`.
 
 A rendered notification is a text message, optionally followed by files
 ("extras") — e.g. the delivered files under a review card, or a reviewer's
@@ -22,44 +23,56 @@ from aiogram.exceptions import (
     TelegramForbiddenError,
     TelegramRetryAfter,
 )
-from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from aiogram.types import FSInputFile, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 from eventum_hq.bot import texts
 from eventum_hq.bot.formatters import (
     access_request_card,
+    daily_plan_text,
     esc,
     fa_digits,
+    format_jalali_date,
     format_jalali_datetime,
+    overdue_daily_text,
     reel_card,
     review_card,
     role_label,
+    saturday_report_text,
     task_card,
+    weekly_summary_text,
 )
 from eventum_hq.bot.keyboards.access import access_request_keyboard
 from eventum_hq.bot.keyboards.main_menu import main_menu
 from eventum_hq.bot.keyboards.reels import reel_card_keyboard
-from eventum_hq.bot.keyboards.tasks import review_keyboard, task_card_keyboard
-from eventum_hq.core.timeutil import Clock
+from eventum_hq.bot.keyboards.tasks import review_keyboard, review_queue_keyboard, task_card_keyboard
+from eventum_hq.core.timeutil import Clock, to_tehran
 from eventum_hq.integrations.telegram_archive import TelegramArchive
-from eventum_hq.models import Notification, TaskKind
+from eventum_hq.models import Notification, TaskKind, TaskStatus
+from eventum_hq.services import deadlines as deadline_kinds
+from eventum_hq.services import periodic as periodic_kinds
 from eventum_hq.services import delegations as delegation_kinds
 from eventum_hq.services import reels as reel_kinds
 from eventum_hq.services import reviews as review_kinds
 from eventum_hq.services import tasks as task_kinds
 from eventum_hq.services import users as user_kinds
+from eventum_hq.services.deadlines import DeadlineService
 from eventum_hq.services.notifications import OutboxStore
 from eventum_hq.services.reels import ReelService
+from eventum_hq.services.reports import ReportService
 from eventum_hq.services.reviews import ReviewService
-from eventum_hq.services.tasks import TaskService
+from eventum_hq.services.tasks import TaskRow, TaskService
 from eventum_hq.services.users import UserService
 
 log = logging.getLogger(__name__)
 
 Markup = InlineKeyboardMarkup | ReplyKeyboardMarkup | ReplyKeyboardRemove | None
+MAX_TEXT = 4000  # Telegram's limit is 4096 characters per message
 
 
 class MessageSender(Protocol):
     async def send_message(self, chat_id: int, text: str, **kwargs: Any) -> Any: ...
+
+    async def send_document(self, chat_id: int, document: Any, **kwargs: Any) -> Any: ...
 
 
 class UnknownNotificationKind(Exception):
@@ -75,6 +88,7 @@ class Rendered:
     text: str
     markup: Markup = None
     extras: list[dict[str, Any]] = field(default_factory=list)  # attachments sent after the text
+    document: str | None = None  # local file sent instead of a text (weekly backup); text = caption
 
 
 @dataclass(slots=True)
@@ -84,6 +98,8 @@ class RenderContext:
     reviews: ReviewService | None = None
     clock: Clock | None = None
     reels: ReelService | None = None
+    deadlines: DeadlineService | None = None
+    reports: ReportService | None = None
 
     def now(self) -> datetime:
         if self.clock is None:
@@ -92,6 +108,30 @@ class RenderContext:
 
 
 _TASK_CARD_KINDS = {task_kinds.KIND_TASK_ASSIGNED, task_kinds.KIND_TASK_DUE_CHANGED}
+_DEADLINE_PREFIX = {
+    deadline_kinds.KIND_REMINDER_DAY: texts.NOTIFY_REMINDER_DAY,
+    deadline_kinds.KIND_REMINDER_SOON: texts.NOTIFY_REMINDER_SOON,
+    deadline_kinds.KIND_OVERDUE: texts.NOTIFY_OVERDUE,
+}
+_STILL_PENDING = (TaskStatus.TODO, TaskStatus.IN_PROGRESS)
+
+
+def split_text(text: str, limit: int = MAX_TEXT) -> list[str]:
+    """Split a long message at line breaks so every part fits in one Telegram message."""
+    if len(text) <= limit:
+        return [text]
+    parts: list[str] = []
+    current = ""
+    for line in text.split("\n"):
+        candidate = f"{current}\n{line}" if current else line
+        if len(candidate) > limit and current:
+            parts.append(current)
+            current = line[:limit]
+        else:
+            current = candidate[:limit]
+    if current:
+        parts.append(current)
+    return parts
 
 
 async def _recipient(ctx: RenderContext, payload: dict[str, Any]):  # type: ignore[no-untyped-def]
@@ -123,6 +163,61 @@ async def render(row: Notification, ctx: RenderContext) -> Rendered:
         return Rendered(texts.NOTIFY_TASK_UNASSIGNED.format(code=code, title=title))
     if kind == task_kinds.KIND_TASK_CANCELLED:
         return Rendered(texts.NOTIFY_TASK_CANCELLED.format(code=code, title=title))
+
+    # ---- deadlines (M5)
+    if kind in _DEADLINE_PREFIX:
+        if ctx.tasks is None:
+            raise UnknownNotificationKind("no task service")
+        recipient = await _recipient(ctx, payload)
+        view = await ctx.tasks.get_view(recipient, task_id=int(payload["task_id"]))
+        task = view.task
+        if task.status not in _STILL_PENDING or task.first_submitted_at is not None or task.due_at is None:
+            raise UndeliverableNotification("task no longer pending")
+        if kind != deadline_kinds.KIND_OVERDUE and task.due_at <= ctx.now():
+            raise UndeliverableNotification("reminder is too late")  # e.g. held back by quiet hours
+        prefix = _DEADLINE_PREFIX[kind].format(code=esc(task.code))
+        return Rendered(prefix + task_card(view, ctx.now()), task_card_keyboard(view))
+    if kind == deadline_kinds.KIND_OVERDUE_WATCH:
+        return Rendered(texts.NOTIFY_OVERDUE_WATCH.format(code=code, title=title,
+                                                          assignee=esc(payload.get("assignee") or "")))
+    if kind == deadline_kinds.KIND_OVERDUE_DAILY:
+        if ctx.deadlines is None:
+            raise UnknownNotificationKind("no deadline service")
+        recipient = await _recipient(ctx, payload)
+        scope = str(payload.get("scope") or deadline_kinds.SCOPE_MINE)
+        rows = await ctx.deadlines.overdue_for(recipient, scope)
+        if not rows:
+            raise UndeliverableNotification("nothing overdue any more")
+        return Rendered(overdue_daily_text(rows, scope, ctx.now()))
+
+    # ---- reports and group messages (M5)
+    if kind == periodic_kinds.KIND_SATURDAY_REPORT:
+        if ctx.reports is None:
+            raise UnknownNotificationKind("no report service")
+        recipient = await _recipient(ctx, payload)
+        return report_message(await ctx.reports.saturday(recipient), ctx.now())
+    if kind == periodic_kinds.KIND_DAILY_PLAN:
+        if ctx.reports is None:
+            raise UnknownNotificationKind("no report service")
+        plan = await ctx.reports.daily_plan()
+        if plan.empty:
+            raise UndeliverableNotification("nothing planned today")
+        return Rendered(daily_plan_text(plan))
+    if kind == periodic_kinds.KIND_WEEKLY_SUMMARY:
+        if ctx.reports is None:
+            raise UnknownNotificationKind("no report service")
+        return Rendered(weekly_summary_text(await ctx.reports.weekly_summary()))
+
+    # ---- system (M5)
+    if kind == periodic_kinds.KIND_HEARTBEAT:
+        since = format_jalali_datetime(datetime.fromisoformat(payload["since"]))
+        return Rendered(texts.HEARTBEAT_ALERT.format(minutes=fa_digits(payload.get("minutes", 0)), since=since))
+    if kind == periodic_kinds.KIND_BACKUP_WEEKLY:
+        caption = texts.BACKUP_WEEKLY_CAPTION.format(date=format_jalali_date(to_tehran(ctx.now()).date()))
+        return Rendered(caption, document=str(payload["path"]))
+    if kind == periodic_kinds.KIND_BACKUP_TOO_BIG:
+        size_mb = round(int(payload.get("size", 0)) / (1024 * 1024), 1)
+        return Rendered(texts.BACKUP_TOO_BIG.format(size=fa_digits(size_mb), path=esc(payload.get("path", ""))))
 
     # ---- reviews
     if kind == review_kinds.KIND_REVIEW_REQUESTED:
@@ -218,6 +313,13 @@ async def render(row: Notification, ctx: RenderContext) -> Rendered:
     raise UnknownNotificationKind(kind)
 
 
+def report_message(report: Any, now: datetime) -> Rendered:
+    """Saturday report text + one button per task waiting for my approval."""
+    rows = [TaskRow(line.task, line.assignee) for line in report.approvals]
+    markup = review_queue_keyboard(rows, now) if rows else None
+    return Rendered(saturday_report_text(report, now), markup)
+
+
 class OutboxSender:
     def __init__(
         self,
@@ -229,10 +331,13 @@ class OutboxSender:
         reviews: ReviewService | None = None,
         archive: TelegramArchive | None = None,
         reels: ReelService | None = None,
+        deadlines: DeadlineService | None = None,
+        reports: ReportService | None = None,
     ) -> None:
         self._sender = sender
         self._store = store
-        self._ctx = RenderContext(users=users, tasks=tasks, reviews=reviews, clock=clock, reels=reels)
+        self._ctx = RenderContext(users=users, tasks=tasks, reviews=reviews, clock=clock, reels=reels,
+                                  deadlines=deadlines, reports=reports)
         self._archive = archive
         self._lock = asyncio.Lock()  # never deliver the same row twice in parallel
 
@@ -241,6 +346,15 @@ class OutboxSender:
         sent = 0
         async with self._lock:
             for row in await self._store.due_urgent():
+                if await self._deliver(row):
+                    sent += 1
+        return sent
+
+    async def deliver_due(self) -> int:
+        """Send every due row, urgent or not (the 60-second tick). Returns the number sent."""
+        sent = 0
+        async with self._lock:
+            for row in await self._store.due_all():
                 if await self._deliver(row):
                     sent += 1
         return sent
@@ -254,10 +368,21 @@ class OutboxSender:
             return False
 
         try:
-            await self._sender.send_message(row.chat_id, rendered.text, reply_markup=rendered.markup)
+            if rendered.document is not None:
+                await self._sender.send_document(row.chat_id, FSInputFile(rendered.document),
+                                                 caption=rendered.text)
+            else:
+                parts = split_text(rendered.text)
+                for i, part in enumerate(parts):
+                    markup = rendered.markup if i == len(parts) - 1 else None
+                    await self._sender.send_message(row.chat_id, part, reply_markup=markup)
         except TelegramRetryAfter as exc:
             log.warning("outbox rate-limited id=%s retry_after=%s", row.id, exc.retry_after)
-            await self._store.mark_failed(row.id, f"retry_after={exc.retry_after}")
+            await self._store.mark_failed(row.id, f"retry_after={exc.retry_after}", retry_after=exc.retry_after)
+            return False
+        except FileNotFoundError as exc:
+            log.warning("outbox file missing id=%s: %s", row.id, exc)
+            await self._store.mark_failed(row.id, repr(exc), permanent=True)
             return False
         except (TelegramForbiddenError, TelegramBadRequest) as exc:
             # user blocked the bot / chat not found: retrying will not help

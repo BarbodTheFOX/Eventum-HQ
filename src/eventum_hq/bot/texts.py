@@ -566,3 +566,105 @@ NOTIFY_REEL_TASK_APPROVED = "✅ {kind} ریل <b>{reel_code}</b> «{title}» ت
 NOTIFY_REEL_READY = "🚀 <b>ریل {reel_code} آماده انتشار است.</b>\n\n"
 NOTIFY_REEL_PUBLISHED = "✅ <b>ریل {reel_code} منتشر شد.</b>\n\n"
 NOTIFY_REEL_CANCELLED = "❌ ریل <b>{reel_code}</b> «{title}» لغو شد و تسک شما بسته شد."
+
+# ---- M5: reminders, overdue, reports, recurrences, backups ----------------------------
+
+NOTIFY_REMINDER_DAY = "⏰ <b>یادآوری:</b> ددلاین <b>{code}</b> امروز است.\n\n"
+NOTIFY_REMINDER_SOON = "⏰ <b>ددلاین {code} نزدیک است.</b>\n\n"
+NOTIFY_OVERDUE = "🔴 <b>ددلاین {code} گذشت.</b> اگر کار آماده است، از همین کارت تحویل بدهید.\n\n"
+NOTIFY_OVERDUE_WATCH = "🔴 <b>ددلاین گذشت:</b> {code} · {title}\nمسئول: {assignee}"
+OVERDUE_DAILY_MINE = "🔴 <b>کارهای عقب‌افتادهٔ شما ({count})</b>"
+OVERDUE_DAILY_ALL = "🔴 <b>کارهای عقب‌افتادهٔ تیم ({count})</b>"
+OVERDUE_LINE = "\n• {code} · {title} — {assignee} — {delta}"
+OVERDUE_LINE_MINE = "\n• {code} · {title} — {delta}"
+
+HEARTBEAT_ALERT = (
+    "⚠️ <b>زمان‌بندی ربات {minutes} دقیقه کار نکرده بود</b> (از {since}).\n"
+    "احتمالاً ربات یا سرور خاموش یا قطع بوده. یادآوری‌ها و گزارش‌ها از الان ادامه پیدا می‌کنند."
+)
+BACKUP_WEEKLY_CAPTION = "🗄 بکاپ هفتگی دیتابیس Eventum HQ — {date}"
+BACKUP_TOO_BIG = (
+    "⚠️ بکاپ هفتگی {size} مگابایت است و برای فرستادن در تلگرام بزرگ است؛ "
+    "فقط روی سرور نگه داشته شد:\n<code>{path}</code>"
+)
+
+DAILY_PLAN_TITLE = "📅 <b>برنامهٔ امروز — {date}</b>"
+DAILY_PLAN_PERSON = "\n\n👤 <b>{name}</b>"
+DAILY_PLAN_TASK = "\n• {code} · {title} — ساعت {time}"
+DAILY_PLAN_PUBLISHES = "\n\n🚀 <b>انتشارهای امروز</b>"
+DAILY_PLAN_PUBLISH = "\n• {code} · {title} — ساعت {time}"
+
+WEEKLY_SUMMARY_TITLE = "📊 <b>جمع‌بندی هفته</b>"
+WEEKLY_SUMMARY_OUTPUTS = "\n\n✅ خروجی‌های تأییدشده: {total}"
+WEEKLY_SUMMARY_OUTPUT_LINE = "\n• {label}: {count}"
+WEEKLY_SUMMARY_PUBLISHED = "\n🚀 ریل‌های منتشرشده: {count}"
+WEEKLY_SUMMARY_NEXT = "\n\n📅 <b>انتشارهای هفتهٔ بعد</b>"
+WEEKLY_SUMMARY_NEXT_LINE = "\n• {code} · {title} — {when}"
+WEEKLY_SUMMARY_NOTHING_NEXT = "\nهنوز چیزی برنامه‌ریزی نشده."
+OUTPUT_TYPE_LABELS = {"REEL_VIDEO": "ویدیوی ریل", "REEL_COVER": "کاور ریل", "OTHER": "سایر"}
+
+REPORT_TITLE = "📊 <b>گزارش — {date}</b>"
+REPORT_APPROVALS = "\n\n✅ <b>منتظر تأیید من ({count})</b>"
+REPORT_OVERDUE = "\n\n🔴 <b>عقب‌افتاده ({count})</b>"
+REPORT_AT_RISK = "\n\n🟠 <b>در خطر ({count})</b>"
+REPORT_TASK_LINE = "\n• {code} · {title} — {assignee} — {delta}{reason}"
+REPORT_APPROVAL_LINE = "\n• {code} · {title} — {assignee}"
+REPORT_REASON = " ({reason})"
+REPORT_PUBLISHES = "\n\n🚀 <b>انتشارهای هفتهٔ پیش رو ({count})</b>"
+REPORT_PUBLISH_LINE = "\n• {code} · {title} — {when} — {readiness}"
+REPORT_READY = "✅ آماده"
+REPORT_MISSING = "مانده: {items}"
+REPORT_PEOPLE = "\n\n👥 <b>بار کاری و کیفیت</b>"
+REPORT_PERSON = (
+    "\n\n<b>{name}</b>"
+    "\n• کارهای باز: {open} ({open_time})"
+    "\n• ددلاین این هفته: {week} ({week_time}){over}"
+    "\n• باز بدون زمان تخمینی: {no_estimate}"
+    "\n• تحویل به‌موقع (۷ روز اخیر): {on_time}"
+    "\n• میانگین دور اصلاح (۷ روز اخیر): {revisions}"
+)
+REPORT_OVER_CAPACITY = " ⚠️ بیش از ظرفیت"
+REPORT_EMPTY = "\nچیزی نیست ✅"
+REPORT_NO_DATA = "—"
+REPORT_PERCENT = "{n}٪"
+
+BTN_RECURRENCES = "🔁 کارهای تکراری"
+BTN_NEW_RECURRENCE = "➕ کار تکراری جدید"
+BTN_STOP_RECURRENCE = "⛔️ توقف: {title}"
+BTN_BACK_TO_TEAM = "↩️ بازگشت به تیم"
+BTN_RULE_DAILY = "هر روز"
+BTN_RULE_WEEKDAYS = "روزهای مشخص هفته"
+BTN_WEEKDAYS_DONE = "✅ تأیید روزها"
+BTN_CREATE_RECURRENCE = "✅ ساخت کار تکراری"
+RECURRENCES_TITLE = "🔁 <b>کارهای تکراری</b>"
+RECURRENCES_EMPTY = "\n\nهنوز کار تکراری فعالی نیست."
+RECURRENCE_LINE = "\n\n• <b>{title}</b>\n  👤 {assignee} — {rule}\n  🕗 ساخت {create} · ⏰ ددلاین {due}"
+RULE_DAILY_LABEL = "هر روز"
+RULE_WEEKDAYS_LABEL = "{days}"
+NEW_RECURRENCE_TITLE = "🔁 <b>کار تکراری جدید</b>\n\nعنوان کار را بنویسید:\n(برای لغو در هر مرحله: /cancel)"
+NEW_RECURRENCE_ASSIGNEE = "👤 مسئول این کار کیست؟"
+NEW_RECURRENCE_RULE = "📆 کِی تکرار شود؟"
+NEW_RECURRENCE_WEEKDAYS = "📆 روزها را انتخاب کنید (چندتایی)، بعد «تأیید روزها» را بزنید:"
+NEW_RECURRENCE_CREATE_TIME = (
+    "🕗 تسک هر روز چه ساعتی ساخته و برای مسئول فرستاده شود؟\n"
+    "یکی از دکمه‌ها را بزنید یا ساعت را بنویسید، مثلاً <code>08:30</code>."
+)
+NEW_RECURRENCE_DUE_TIME = (
+    "⏰ ددلاین همان روز چه ساعتی باشد؟\n"
+    "یکی از دکمه‌ها را بزنید یا ساعت را بنویسید، مثلاً <code>18:00</code>."
+)
+NEW_RECURRENCE_SUMMARY = (
+    "📝 <b>بررسی نهایی کار تکراری</b>\n\n"
+    "عنوان: {title}\nمسئول: {assignee}\nتکرار: {rule}\n"
+    "ساخت: ساعت {create}\nددلاین: ساعت {due}\n"
+    "زنجیرهٔ تأیید: {chain}\nزمان تخمینی: {estimate}"
+)
+RECURRENCE_CREATED = "✅ کار تکراری «{title}» ساخته شد. اولین تسک در زمان ساخت بعدی فرستاده می‌شود."
+RECURRENCE_STOPPED = "⛔️ کار تکراری «{title}» متوقف شد. تسک‌هایی که قبلاً ساخته شده‌اند دست‌نخورده می‌مانند."
+WEEKDAYS_REQUIRED = "حداقل یک روز را انتخاب کنید."
+
+VALIDATION_MESSAGES.update({
+    "weekdays_invalid": "حداقل یک روز هفته را انتخاب کنید.",
+    "due_before_create": "ساعت ددلاین باید بعد از ساعت ساخت باشد.",
+    "assignee_invalid": "این مسئول دیگر فعال نیست. نفر دیگری را انتخاب کنید.",
+})

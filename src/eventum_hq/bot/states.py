@@ -69,3 +69,17 @@ class PublishFlow(StatesGroup):
 PURPOSE_REEL_PUBLISH = "reel_publish"
 PURPOSE_REEL_DEADLINE = "reel_deadline"
 PURPOSE_PUBLISHED_AT = "published_at"
+
+
+class RecurrenceFlow(StatesGroup):
+    """➕ new recurring task (F10). Data: title, assignee_id, rule, weekdays, create_time, due_time, chain."""
+
+    title = State()
+    assignee = State()
+    rule = State()
+    weekdays = State()
+    create_time = State()
+    due_time = State()
+    chain = State()
+    estimate = State()
+    confirm = State()

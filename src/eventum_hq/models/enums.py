@@ -108,3 +108,8 @@ class NotificationStatus(StrEnum):
     SENT = "SENT"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+
+
+class RecurrenceRule(StrEnum):
+    DAILY = "DAILY"
+    WEEKDAYS = "WEEKDAYS"  # only on the listed weekdays (0 = Saturday)

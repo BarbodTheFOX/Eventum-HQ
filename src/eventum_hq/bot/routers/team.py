@@ -10,11 +10,12 @@ from typing import Any
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from eventum_hq.bot import texts
 from eventum_hq.bot.formatters import format_jalali_datetime, user_label
 from eventum_hq.bot.keyboards.main_menu import AdminViews, menu_for
+from eventum_hq.bot.keyboards.recurrences import recurrences_button_row
 from eventum_hq.bot.keyboards.tasks import (
     TeamAction,
     TeamCb,
@@ -44,6 +45,13 @@ async def _team_text(delegations: DelegationService) -> tuple[str, int | None]:
     return texts.TEAM_MENU.format(delegation=status) + texts.TEAM_MORE_SOON, active_id
 
 
+def _team_markup(user: User, active_id: int | None) -> InlineKeyboardMarkup:
+    markup = team_keyboard(can_delegate=has_capability(user, Capability.DELEGATE), active_delegation_id=active_id)
+    if has_capability(user, Capability.CREATE_TASK):  # 🔁 recurring tasks (F10, M5)
+        markup.inline_keyboard.append(recurrences_button_row())
+    return markup
+
+
 @router.message(F.text == texts.MENU_LABELS[MenuItem.TEAM])
 async def menu_team(message: Message, state: FSMContext, current_user: User, delegations: DelegationService,
                     admin_views: AdminViews) -> None:
@@ -52,8 +60,7 @@ async def menu_team(message: Message, state: FSMContext, current_user: User, del
         await message.answer(texts.PERMISSION_DENIED, reply_markup=menu_for(current_user, admin_views))
         return
     text, active_id = await _team_text(delegations)
-    await message.answer(text, reply_markup=team_keyboard(
-        can_delegate=has_capability(current_user, Capability.DELEGATE), active_delegation_id=active_id))
+    await message.answer(text, reply_markup=_team_markup(current_user, active_id))
 
 
 @router.callback_query(TeamCb.filter())
@@ -68,7 +75,7 @@ async def on_team(query: CallbackQuery, callback_data: TeamCb, state: FSMContext
     if action == TeamAction.HOME:
         await state.clear()
         text, active_id = await _team_text(delegations)
-        await reply(query, text, team_keyboard(can_delegate=can_delegate, active_delegation_id=active_id))
+        await reply(query, text, _team_markup(current_user, active_id))
     elif action == TeamAction.NEW_DELEGATION:
         candidates = await delegations.candidates()
         if not candidates:
@@ -90,7 +97,7 @@ async def on_team(query: CallbackQuery, callback_data: TeamCb, state: FSMContext
             return
         text, active_id = await _team_text(delegations)
         await reply(query, texts.DELEGATION_REVOKED + "\n\n" + text,
-                    team_keyboard(can_delegate=can_delegate, active_delegation_id=active_id))
+                    _team_markup(current_user, active_id))
     await query.answer()
 
 

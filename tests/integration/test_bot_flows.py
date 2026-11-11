@@ -30,7 +30,10 @@ from eventum_hq.models import Role, Task, TaskStatus, User
 from eventum_hq.services.notifications import OutboxStore
 from eventum_hq.services.permissions import ROLE_DEFAULT_CAPABILITIES, MenuItem
 from eventum_hq.integrations.telegram_archive import TelegramArchive
+from eventum_hq.services.deadlines import DeadlineService
 from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.recurrences import RecurrenceService
+from eventum_hq.services.reports import ReportService
 from eventum_hq.services.reels import ReelService
 from eventum_hq.services.reviews import ReviewService
 from eventum_hq.services.tasks import TaskService
@@ -74,13 +77,17 @@ class Harness:
         self.delegations = DelegationService(db, clock)
         self.reels = ReelService(db, clock)
         self.archive = TelegramArchive(self.bot, archive_channel_id)
-        outbox = OutboxSender(self.bot, OutboxStore(db, clock), users, self.tasks, clock,
-                              self.reviews, self.archive, self.reels)
+        self.deadlines = DeadlineService(db, clock)
+        self.reports = ReportService(db, clock)
+        self.recurrences = RecurrenceService(db, clock)
+        self.outbox = outbox = OutboxSender(self.bot, OutboxStore(db, clock), users, self.tasks, clock,
+                                            self.reviews, self.archive, self.reels, self.deadlines, self.reports)
         settings = load_settings(_env_file=None, bot_token="42:TEST", owner_telegram_id=OWNER_TG,
                                  archive_channel_id=archive_channel_id)
         self.dp = build_dispatcher(
             settings=settings, users=users, tasks=self.tasks, reviews=self.reviews,
             delegations=self.delegations, reels=self.reels, archive=self.archive, outbox=outbox, clock=clock,
+            recurrences=self.recurrences, reports=self.reports,
         )
         self._n = 0
 
@@ -133,11 +140,12 @@ class Harness:
 def _detach_routers() -> None:
     """aiogram routers are module singletons; free them so the next test can attach them."""
     from eventum_hq.bot.routers import (
-        access, dates, deliver, errors, groups, menu, reels, review, start, task_create, tasks, team,
+        access, dates, deliver, errors, groups, menu, recurrences, reels, reports, review, start, task_create,
+        tasks, team,
     )
 
-    for module in (access, dates, deliver, errors, groups, menu, reels, review, start, task_create, tasks,
-                   team):
+    for module in (access, dates, deliver, errors, groups, menu, recurrences, reels, reports, review, start,
+                   task_create, tasks, team):
         module.router._parent_router = None
 
 

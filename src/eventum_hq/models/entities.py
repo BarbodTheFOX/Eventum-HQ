@@ -6,10 +6,8 @@ recurrences are added in their own milestones with their own migrations.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, time
 from typing import Any
-
-from datetime import date
 
 from sqlalchemy import (
     JSON,
@@ -21,6 +19,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Time,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -34,6 +33,7 @@ from eventum_hq.models.enums import (
     ContentType,
     NotificationStatus,
     OutputType,
+    RecurrenceRule,
     ReviewDecision,
     ReviewStage,
     Role,
@@ -150,7 +150,7 @@ class ContentItem(IdMixin, TimestampMixin, Base):
 class Task(IdMixin, TimestampMixin, Base):
     """One unit of work with one assignee (handoff §4.1, §7).
 
-    ``recurrence_id`` gets its foreign key in M5, when ``recurrences`` exists.
+    ``recurrence_id`` points at the Recurrence that generated the task (M5).
     """
 
     __tablename__ = "tasks"
@@ -187,7 +187,9 @@ class Task(IdMixin, TimestampMixin, Base):
     first_submitted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     revision_round: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    recurrence_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recurrence_id: Mapped[int | None] = mapped_column(
+        ForeignKey("recurrences.id", ondelete="SET NULL"), nullable=True
+    )
     recurrence_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     external_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -293,3 +295,42 @@ class Delegation(IdMixin, TimestampMixin, Base):
     starts_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     ends_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class Recurrence(IdMixin, TimestampMixin, Base):
+    """Template for a simple repeating generic task (F10, handoff §4.10)."""
+
+    __tablename__ = "recurrences"
+
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assignee_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    series_id: Mapped[int | None] = mapped_column(
+        ForeignKey("series.id", ondelete="RESTRICT"), nullable=True
+    )
+    approval_chain: Mapped[ApprovalChain] = mapped_column(enum_column(ApprovalChain), nullable=False)
+    rule: Mapped[RecurrenceRule] = mapped_column(enum_column(RecurrenceRule), nullable=False)
+    weekdays: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)  # 0 = Saturday
+    create_time: Mapped[time] = mapped_column(Time(), nullable=False)  # Tehran wall clock
+    due_time: Mapped[time] = mapped_column(Time(), nullable=False)  # Tehran wall clock, same day
+    estimated_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_by: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+
+
+class JobRun(IdMixin, TimestampMixin, Base):
+    """Marks that a scheduled job ran for a key (e.g. ``backup.daily`` / ``2026-11-11``).
+
+    Makes the 60-second tick idempotent across restarts. ``tick``/``last`` holds the heartbeat.
+    """
+
+    __tablename__ = "job_runs"
+    __table_args__ = (UniqueConstraint("job", "run_key"),)
+
+    job: Mapped[str] = mapped_column(String(64), nullable=False)
+    run_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    ran_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)

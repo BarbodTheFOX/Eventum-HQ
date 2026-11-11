@@ -87,12 +87,17 @@ async def test_failures_are_counted_then_marked_failed(
             dedupe_key="k1", now=clock.now(), urgent=True,
         )
     outbox = OutboxSender(FakeSender(fail_with=RuntimeError("network down")), OutboxStore(db, clock), users)
-    for _ in range(MAX_ATTEMPTS - 1):
+    assert await outbox.flush_urgent() == 0
+    assert await outbox.flush_urgent() == 0  # backoff (M5): not retried right away
+    assert (await _rows(db))[0].attempts == 1
+    for _ in range(MAX_ATTEMPTS - 2):
+        clock.advance(minutes=30)
         assert await outbox.flush_urgent() == 0
     row = (await _rows(db))[0]
     assert row.status == NotificationStatus.PENDING and row.attempts == MAX_ATTEMPTS - 1
     assert "network down" in (row.last_error or "")
 
+    clock.advance(minutes=30)
     await outbox.flush_urgent()
     row = (await _rows(db))[0]
     assert row.status == NotificationStatus.FAILED and row.attempts == MAX_ATTEMPTS

@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from html import escape
 
 from eventum_hq.bot import texts
 from eventum_hq.core.jalali import jalali_date_parts, jalali_parts
-from eventum_hq.models import Role, Task, TaskInputKind, TaskKind, TaskStatus, User
+from eventum_hq.core.timeutil import to_tehran
+from eventum_hq.models import RecurrenceRule, Role, Task, TaskInputKind, TaskKind, TaskStatus, User
+from eventum_hq.services.deadlines import SCOPE_MINE, OverdueRow
+from eventum_hq.services.recurrences import RecurrenceRow
 from eventum_hq.services.reels import ReelView
+from eventum_hq.services.reports import DailyPlan, SaturdayReport, TaskLine, WeeklySummary
 from eventum_hq.services.reviews import ReviewView
 from eventum_hq.services.tasks import (
     DeadlineState,
@@ -291,5 +295,146 @@ def reel_card(view: ReelView) -> str:
         text += texts.REEL_CARD_PUBLISHED.format(
             when=format_jalali_datetime(item.published_at),
             links="\n🔗 ".join(esc(link) for link in item.publish_links),
+        )
+    return text
+
+
+# ---- M5: reminders, reports, recurrences --------------------------------------------
+
+
+def format_hhmm(value: time) -> str:
+    return fa_digits(f"{value.hour:02d}:{value.minute:02d}")
+
+
+def local_hhmm(value: datetime) -> str:
+    return format_hhmm(to_tehran(value).time())
+
+
+def _reason(task: Task) -> str:
+    if task.status == TaskStatus.BLOCKED and task.blocked_reason:
+        reason = texts.BLOCKED_REASONS.get(task.blocked_reason, task.blocked_reason)
+        return texts.REPORT_REASON.format(reason=esc(reason))
+    return ""
+
+
+def overdue_daily_text(rows: list[OverdueRow], scope: str, now: datetime) -> str:
+    mine = scope == SCOPE_MINE
+    title = texts.OVERDUE_DAILY_MINE if mine else texts.OVERDUE_DAILY_ALL
+    text = title.format(count=fa_digits(len(rows)))
+    for row in rows:
+        assert row.task.due_at is not None
+        delta = humanize_delta(row.task.due_at, now)
+        code, name = esc(row.task.code), esc(_short(row.task.title, 60))
+        if mine:
+            text += texts.OVERDUE_LINE_MINE.format(code=code, title=name, delta=delta)
+        else:
+            text += texts.OVERDUE_LINE.format(code=code, title=name, assignee=user_label(row.assignee), delta=delta)
+    return text
+
+
+def daily_plan_text(plan: DailyPlan) -> str:
+    text = texts.DAILY_PLAN_TITLE.format(date=format_jalali_date(plan.day))
+    for user, tasks in plan.deliveries:
+        text += texts.DAILY_PLAN_PERSON.format(name=user_label(user))
+        for t in tasks:
+            assert t.due_at is not None
+            text += texts.DAILY_PLAN_TASK.format(code=esc(t.code), title=esc(_short(t.title, 60)),
+                                                 time=local_hhmm(t.due_at))
+    if plan.publishes:
+        text += texts.DAILY_PLAN_PUBLISHES
+        for item in plan.publishes:
+            assert item.planned_publish_at is not None
+            text += texts.DAILY_PLAN_PUBLISH.format(code=esc(item.code), title=esc(_short(item.title, 60)),
+                                                    time=local_hhmm(item.planned_publish_at))
+    return text
+
+
+def weekly_summary_text(summary: WeeklySummary) -> str:
+    total = sum(summary.outputs_by_type.values())
+    text = texts.WEEKLY_SUMMARY_TITLE + texts.WEEKLY_SUMMARY_OUTPUTS.format(total=fa_digits(total))
+    for key, label in texts.OUTPUT_TYPE_LABELS.items():
+        if summary.outputs_by_type.get(key):
+            text += texts.WEEKLY_SUMMARY_OUTPUT_LINE.format(label=label,
+                                                           count=fa_digits(summary.outputs_by_type[key]))
+    text += texts.WEEKLY_SUMMARY_PUBLISHED.format(count=fa_digits(summary.published_reels))
+    text += texts.WEEKLY_SUMMARY_NEXT
+    if not summary.next_week:
+        return text + texts.WEEKLY_SUMMARY_NOTHING_NEXT
+    for item in summary.next_week:
+        assert item.planned_publish_at is not None
+        text += texts.WEEKLY_SUMMARY_NEXT_LINE.format(code=esc(item.code), title=esc(_short(item.title, 60)),
+                                                     when=format_jalali_datetime(item.planned_publish_at))
+    return text
+
+
+def _task_lines(lines: list[TaskLine], now: datetime) -> str:
+    if not lines:
+        return texts.REPORT_EMPTY
+    out = ""
+    for line in lines:
+        t = line.task
+        delta = humanize_delta(t.due_at, now) if t.due_at else texts.REPORT_NO_DATA
+        out += texts.REPORT_TASK_LINE.format(code=esc(t.code), title=esc(_short(t.title, 50)),
+                                             assignee=user_label(line.assignee), delta=delta, reason=_reason(t))
+    return out
+
+
+def saturday_report_text(report: SaturdayReport, now: datetime) -> str:
+    text = texts.REPORT_TITLE.format(date=format_jalali_date(to_tehran(now).date()))
+    text += texts.REPORT_APPROVALS.format(count=fa_digits(len(report.approvals)))
+    if not report.approvals:
+        text += texts.REPORT_EMPTY
+    for line in report.approvals:
+        text += texts.REPORT_APPROVAL_LINE.format(code=esc(line.task.code), title=esc(_short(line.task.title, 50)),
+                                                  assignee=user_label(line.assignee))
+    text += texts.REPORT_OVERDUE.format(count=fa_digits(len(report.overdue))) + _task_lines(report.overdue, now)
+    text += texts.REPORT_AT_RISK.format(count=fa_digits(len(report.at_risk))) + _task_lines(report.at_risk, now)
+    text += texts.REPORT_PUBLISHES.format(count=fa_digits(len(report.publishes)))
+    if not report.publishes:
+        text += texts.REPORT_EMPTY
+    for p in report.publishes:
+        assert p.item.planned_publish_at is not None
+        if p.open_tasks:
+            missing = "، ".join(f"{esc(t.code)} {status_label(t)}" for t in p.open_tasks)
+            readiness = texts.REPORT_MISSING.format(items=missing)
+        else:
+            readiness = texts.REPORT_READY
+        text += texts.REPORT_PUBLISH_LINE.format(code=esc(p.item.code), title=esc(_short(p.item.title, 50)),
+                                                 when=format_jalali_datetime(p.item.planned_publish_at),
+                                                 readiness=readiness)
+    text += texts.REPORT_PEOPLE
+    if not report.people:
+        text += texts.REPORT_EMPTY
+    for person in report.people:
+        on_time = (texts.REPORT_PERCENT.format(n=fa_digits(person.on_time_percent))
+                   if person.on_time_percent is not None else texts.REPORT_NO_DATA)
+        revisions = (fa_digits(f"{person.avg_revisions:.1f}") if person.avg_revisions is not None
+                     else texts.REPORT_NO_DATA)
+        text += texts.REPORT_PERSON.format(
+            name=user_label(person.user),
+            open=fa_digits(person.open_count), open_time=format_minutes(person.open_minutes),
+            week=fa_digits(person.week_count), week_time=format_minutes(person.week_minutes),
+            over=texts.REPORT_OVER_CAPACITY if person.over_capacity else "",
+            no_estimate=fa_digits(person.without_estimate), on_time=on_time, revisions=revisions,
+        )
+    return text
+
+
+def recurrence_rule_label(rule: str, weekdays: list[int]) -> str:
+    if rule == RecurrenceRule.DAILY:
+        return texts.RULE_DAILY_LABEL
+    return texts.RULE_WEEKDAYS_LABEL.format(days="، ".join(texts.WEEKDAYS[d] for d in sorted(weekdays)))
+
+
+def recurrence_list_text(rows: list[RecurrenceRow]) -> str:
+    text = texts.RECURRENCES_TITLE
+    if not rows:
+        return text + texts.RECURRENCES_EMPTY
+    for row in rows:
+        r = row.recurrence
+        text += texts.RECURRENCE_LINE.format(
+            title=esc(r.title), assignee=user_label(row.assignee),
+            rule=recurrence_rule_label(r.rule, list(r.weekdays or [])),
+            create=format_hhmm(r.create_time), due=format_hhmm(r.due_time),
         )
     return text

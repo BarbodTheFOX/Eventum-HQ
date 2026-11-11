@@ -1,7 +1,7 @@
 """Entry point: ``python -m eventum_hq``.
 
 Startup order: settings → logging → migrations → owner bootstrap → polling.
-The 60-second scheduler tick is added in M5.
+Polling and the 60-second scheduler tick (M5) run side by side.
 """
 
 from __future__ import annotations
@@ -17,15 +17,21 @@ from eventum_hq import __version__
 from eventum_hq.bot.app import build_bot, build_dispatcher, set_commands
 from eventum_hq.bot.outbox import OutboxSender
 from eventum_hq.core.config import Settings, load_settings
-from eventum_hq.core.db import Database
+from eventum_hq.core.db import Database, sqlite_file_path
 from eventum_hq.core.errors import ConfigError
 from eventum_hq.core.logging import setup_logging
 from eventum_hq.core.migrate import upgrade_to_head
 from eventum_hq.core.timeutil import SystemClock
 from eventum_hq.integrations.sync import NoopSync
 from eventum_hq.integrations.telegram_archive import TelegramArchive
+from eventum_hq.scheduler.tick import Scheduler
+from eventum_hq.services.backup import BackupService
+from eventum_hq.services.deadlines import DeadlineService
 from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.periodic import PeriodicService
+from eventum_hq.services.recurrences import RecurrenceService
 from eventum_hq.services.reels import ReelService
+from eventum_hq.services.reports import ReportService
 from eventum_hq.services.reviews import ReviewService
 from eventum_hq.services.notifications import OutboxStore
 from eventum_hq.services.tasks import TaskService
@@ -46,22 +52,36 @@ async def run(settings: Settings) -> None:
     reviews = ReviewService(db, clock, sync)
     delegations = DelegationService(db, clock)
     reels = ReelService(db, clock)
+    recurrences = RecurrenceService(db, clock, sync)
+    deadlines = DeadlineService(db, clock)
+    reports = ReportService(db, clock)
+    db_file = sqlite_file_path(settings.database_url)
+    backups = BackupService(db_file, (db_file.parent if db_file else settings.log_dir.parent) / "backups")
 
     bot = build_bot(settings)
     archive = TelegramArchive(bot, settings.archive_channel_id)
     if not archive.configured:
         log.warning("ARCHIVE_CHANNEL_ID is empty: file deliveries are disabled until it is set")
-    outbox = OutboxSender(bot, OutboxStore(db, clock), users, tasks, clock, reviews, archive, reels)
+    outbox = OutboxSender(bot, OutboxStore(db, clock), users, tasks, clock, reviews, archive, reels,
+                          deadlines, reports)
+    scheduler = Scheduler(
+        periodic=PeriodicService(db, clock, reports, backups, settings.team_group_id),
+        recurrences=recurrences, deadlines=deadlines, outbox=outbox,
+    )
     dp = build_dispatcher(
         settings=settings, users=users, tasks=tasks, reviews=reviews, delegations=delegations,
-        reels=reels, archive=archive, outbox=outbox, clock=clock,
+        reels=reels, archive=archive, outbox=outbox, clock=clock, recurrences=recurrences, reports=reports,
     )
     try:
         me = await bot.get_me()
         log.info("connected as @%s (id=%s)", me.username, me.id)
         await set_commands(bot)
         await outbox.flush_urgent()  # anything left from before a restart
-        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        ticker = asyncio.create_task(scheduler.run_forever(), name="scheduler")
+        try:
+            await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        finally:
+            ticker.cancel()
     finally:
         await bot.session.close()
         await db.dispose()
