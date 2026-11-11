@@ -141,7 +141,8 @@ async def _ask_series(event: Message | CallbackQuery, state: FSMContext, reels: 
 async def on_series(query: CallbackQuery, callback_data: ReelCb, state: FSMContext) -> None:
     series_id = int(callback_data.value) if callback_data.value.isdigit() else 0
     await state.update_data(series_id=series_id or None)
-    await start_date_input(query, state, PURPOSE_REEL_PUBLISH, texts.NEW_REEL_PUBLISH_PROMPT)
+    await start_date_input(query, state, PURPOSE_REEL_PUBLISH, texts.NEW_REEL_PUBLISH_PROMPT,
+                           time_prompt=texts.TIME_PROMPT)
     await query.answer()
 
 
@@ -479,7 +480,8 @@ async def on_publish_other_time(query: CallbackQuery, state: FSMContext) -> None
     if not (await state.get_data())["links"]:
         await query.answer(texts.PUBLISH_NO_LINKS, show_alert=True)
         return
-    await start_date_input(query, state, PURPOSE_PUBLISHED_AT, texts.PUBLISH_TIME_PROMPT)
+    await start_date_input(query, state, PURPOSE_PUBLISHED_AT, texts.PUBLISH_TIME_PROMPT,
+                           time_prompt=texts.TIME_PROMPT)
     await query.answer()
 
 

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from aiogram.methods import CopyMessage, SendMessage
 from sqlalchemy import select
 
 from eventum_hq.bot import texts
+from eventum_hq.bot.formatters import format_jalali_date
 from eventum_hq.core.db import Database
 from eventum_hq.models import (
     ContentItem,
@@ -210,3 +211,17 @@ async def test_reel_task_card_has_no_single_cancel(h: Harness, db: Database) -> 
     card = [c for c in _calls(h, SendMessage) if c.chat_id == AMIN][-1]
     labels = [b.text for row in card.reply_markup.inline_keyboard for b in row]
     assert texts.BTN_CANCEL_TASK not in labels and texts.BTN_CHANGE_DUE in labels
+
+
+async def test_publish_time_question_does_not_say_deadline(h: Harness, db: Database) -> None:
+    await h.text(AMIN, texts.MENU_LABELS[MenuItem.NEW_REEL])
+    await h.text(AMIN, "ریل ساعت")
+    await h.press(AMIN, "nr:sub:NORMAL")
+    await h.press(AMIN, "nr:et:normal")
+    daily = next(s for s in await h.tasks.active_series() if s.name == "ریل روزانه")
+    await h.press(AMIN, f"nr:ser:{daily.id}")
+    await h.text(AMIN, "1405/08/20")  # date only → the picker asks for the hour
+    assert h.last_text(AMIN) == texts.TIME_PROMPT.format(date=format_jalali_date(date(2026, 11, 11)))
+    assert "ددلاین" not in h.last_text(AMIN)
+    await h.text(AMIN, "20:00")
+    assert h.last_text(AMIN) == texts.NEW_REEL_TIMECODES

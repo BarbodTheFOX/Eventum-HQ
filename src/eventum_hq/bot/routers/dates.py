@@ -46,6 +46,7 @@ _HANDLERS: dict[str, DateChosen] = {}
 
 _PURPOSE_KEY = "date_purpose"
 _PROMPT_KEY = "date_prompt"
+_TIME_PROMPT_KEY = "date_time_prompt"
 
 
 def on_date_chosen(purpose: str) -> Callable[[DateChosen], DateChosen]:
@@ -60,10 +61,14 @@ def on_date_chosen(purpose: str) -> Callable[[DateChosen], DateChosen]:
 
 async def start_date_input(
     event: Message | CallbackQuery, state: FSMContext, purpose: str, prompt: str, *, new_message: bool = False,
-    **flow_data: Any,
+    time_prompt: str = texts.DUE_TIME_PROMPT, **flow_data: Any,
 ) -> None:
-    """Switch to the date picker. Keeps existing FSM data (the surrounding flow's answers)."""
-    await state.update_data({_PURPOSE_KEY: purpose, _PROMPT_KEY: prompt, **flow_data})
+    """Switch to the date picker. Keeps existing FSM data (the surrounding flow's answers).
+
+    ``time_prompt`` is the hour question (needs a ``{date}`` slot); the default talks about a deadline.
+    """
+    await state.update_data({_PURPOSE_KEY: purpose, _PROMPT_KEY: prompt, _TIME_PROMPT_KEY: time_prompt,
+                             **flow_data})
     await state.set_state(DateInput.date)
     if new_message and isinstance(event, CallbackQuery) and isinstance(event.message, Message):
         await event.message.answer(prompt, reply_markup=quick_date_keyboard())
@@ -98,7 +103,8 @@ async def on_manual_date(message: Message, state: FSMContext, clock: Clock, **da
 async def _ask_time(event: Message | CallbackQuery, state: FSMContext, day: date) -> None:
     await state.update_data(due_date=day.isoformat())
     await state.set_state(DateInput.time)
-    await reply(event, texts.DUE_TIME_PROMPT.format(date=format_jalali_date(day)), time_keyboard())
+    prompt = (await state.get_data()).get(_TIME_PROMPT_KEY) or texts.DUE_TIME_PROMPT
+    await reply(event, prompt.format(date=format_jalali_date(day)), time_keyboard())
 
 
 @router.callback_query(DateInput.time, DateCb.filter(F.kind == DateKind.TIME))

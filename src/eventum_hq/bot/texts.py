@@ -262,6 +262,10 @@ DUE_TIME_PROMPT = (
     "⏰ ساعت ددلاین ({date})؟\n"
     "یکی از دکمه‌ها را بزنید یا ساعت را بنویسید، مثلاً <code>16:30</code>."
 )
+TIME_PROMPT = (  # same picker when the time is not a deadline (publish time, delegation end)
+    "⏰ چه ساعتی ({date})؟\n"
+    "یکی از دکمه‌ها را بزنید یا ساعت را بنویسید، مثلاً <code>16:30</code>."
+)
 DUE_PAST_CONFIRM = "⚠️ این زمان گذشته است: {due}\nمطمئنید؟"
 BTN_PAST_YES = "✅ بله، همین زمان"
 BTN_PAST_NO = "✏️ زمان دیگر"

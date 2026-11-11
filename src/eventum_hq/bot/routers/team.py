@@ -78,7 +78,7 @@ async def on_team(query: CallbackQuery, callback_data: TeamCb, state: FSMContext
     elif action == TeamAction.PICK_DELEGATE:
         await state.clear()
         await start_date_input(query, state, PURPOSE_DELEGATION, texts.DELEGATION_END_PROMPT,
-                               delegate_id=callback_data.arg)
+                               time_prompt=texts.TIME_PROMPT, delegate_id=callback_data.arg)
     elif action == TeamAction.REVOKE:
         try:
             await delegations.revoke(current_user, callback_data.arg)

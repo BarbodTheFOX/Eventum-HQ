@@ -17,6 +17,7 @@ from eventum_hq.bot.middlewares import (
     OutboxFlushMiddleware,
 )
 from eventum_hq.bot.outbox import OutboxSender
+from eventum_hq.bot.request_middlewares import IgnoreExpiredCallbackAnswer
 from eventum_hq.bot.routers import build_root_router
 from eventum_hq.core.config import Settings
 from eventum_hq.core.timeutil import Clock
@@ -30,11 +31,13 @@ from eventum_hq.services.users import UserService
 
 def build_bot(settings: Settings) -> Bot:
     session = AiohttpSession(proxy=settings.telegram_proxy) if settings.telegram_proxy else None
-    return Bot(
+    bot = Bot(
         token=settings.bot_token.get_secret_value(),
         session=session,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    bot.session.middleware(IgnoreExpiredCallbackAnswer())
+    return bot
 
 
 def build_dispatcher(
