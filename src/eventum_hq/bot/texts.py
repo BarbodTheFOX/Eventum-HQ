@@ -108,17 +108,30 @@ GENERIC_ERROR = "⚠️ مشکلی پیش آمد. لطفاً دوباره تلا
 
 HELP = (
     "❓ <b>راهنمای Eventum HQ</b>\n\n"
-    "این ربات محل ثبت و پیگیری همهٔ کارهای تیم Eventum Space است.\n\n"
+    "هر کار تیم این‌جا یک رکورد دارد: مسئول، ددلاین، وضعیت، فایل‌ها و تاریخچهٔ اصلاح و تأیید.\n\n"
+    "<b>کار روزانهٔ شما</b>\n"
+    "1️⃣ «📋 کارهای من»: روی هر کار بزنید تا کارتش باز شود.\n"
+    "2️⃣ «▶️ شروع کار» (اختیاری) را بزنید و کار را انجام دهید.\n"
+    "3️⃣ «📤 تحویل»: فایل یا لینک را بفرستید (هر تعداد)، یادداشت اختیاری، بعد «✅ ارسال برای بررسی».\n"
+    "4️⃣ اگر اصلاح خواستند، یادداشت‌ها برایتان می‌آید؛ نسخهٔ جدید را از همان کارت تحویل دهید.\n"
+    "5️⃣ بعد از تأیید، اگر کار مرحلهٔ آپلود یا انتشار دارد، «🏁 انجام شد» را بزنید.\n\n"
+    "<b>نکته‌ها</b>\n"
+    "• یادآوری ددلاین ساعت ۱۰ روز ددلاین و ۲ ساعت قبل از آن می‌آید.\n"
+    "• از ۲۳ تا ۹ صبح ربات پیامی نمی‌فرستد؛ پیام‌ها ساعت ۹ می‌رسند.\n"
+    "• فایل نهایی هر کار تأییدشده را در «📚 کتابخانه» پیدا کنید.\n"
+    "• برای دیدن یک تسک یا ریل، کدش را بفرستید؛ مثلاً <code>T-0012</code> یا <code>R-0003</code>.\n"
+    "• تاریخ را این‌طور بنویسید: <code>1405/08/25 18:00</code> (سال و ساعت اختیاری‌اند).\n\n"
     "<b>دستورها</b>\n"
-    "/start — شروع و نمایش منو\n"
-    "/menu — نمایش منوی اصلی\n"
+    "/menu — منوی اصلی\n"
     "/my — کارهای من\n"
     "/cancel — لغو کار نیمه‌تمام\n"
     "/help — همین راهنما\n\n"
-    "برای دیدن یک تسک، کد آن را بفرستید؛ مثلاً <code>T-0012</code>.\n"
-    "فایل نهایی هر کار تأییدشده را در «📚 کتابخانه» پیدا کنید.\n\n"
-    "دکمه‌های منو بر اساس نقش شما نمایش داده می‌شوند. "
-    "بخش‌ها به‌تدریج فعال می‌شوند."
+    "دکمه‌های منو بر اساس نقش شما نمایش داده می‌شوند."
+)
+HELP_ADMIN = (
+    "\n\n<b>مدیر سیستم</b>\n"
+    "/health — وضعیت ربات، زمان‌بندی و بکاپ\n"
+    "/backup — گرفتن بکاپ همین الان و دریافت فایل آن"
 )
 
 # ---- bot command list (Telegram "Menu" button) ------------------------------
@@ -430,7 +443,7 @@ NOTIFY_DELEGATION_REVOKED = "⛔️ <b>تفویض تأیید نهایی لغو �
 TEAM_MENU = "👥 <b>تیم</b>\n\n🔁 تفویض تأیید نهایی: {delegation}"
 TEAM_NO_DELEGATION = "فعال نیست"
 TEAM_DELEGATION_ACTIVE = "{to_name} تا {ends}"
-TEAM_MORE_SOON = "\n\nمدیریت کاربران، نقش‌ها و ظرفیت هفتگی در نسخه‌های بعدی اضافه می‌شود."
+TEAM_MORE_SOON = "\n\nتغییر نقش، دسترسی‌ها و ظرفیت هفتگی افراد در نسخه‌های بعدی اضافه می‌شود."
 BTN_NEW_DELEGATION = "🔁 تفویض جدید"
 BTN_REVOKE_DELEGATION = "⛔️ لغو تفویض"
 DELEGATION_PICK = "🔁 تأیید نهایی به چه کسی تفویض شود؟"
@@ -727,3 +740,116 @@ LIB_DETAIL_FILES = "\n\n📎 {count} فایل در پیام‌های بعدی �
 LIB_DETAIL_NO_FILES = "\n\n(این خروجی فایل ندارد.)"
 LIB_FILE_FAILED = "⚠️ ارسال یکی از فایل‌ها ممکن نشد."
 LIB_NOT_FOUND = "این خروجی پیدا نشد."
+# ---- 👤 team members and offboarding (F15, M6) -------------------------------------
+
+BTN_MEMBERS = "👤 اعضای تیم"
+BTN_HANDOVERS = "⚠️ تحویل کار اعضای غیرفعال ({count})"
+TEAM_ORPHAN_RECURRENCES = "\n\n⚠️ {count} کار تکراری مسئول فعال ندارد و تا تعیین مسئول جدید ساخته نمی‌شود."
+TEAM_PENDING_HANDOVERS = "\n\n⚠️ کارهای باز {count} عضو غیرفعال هنوز به کسی سپرده نشده است."
+MEMBERS_TITLE = "👤 <b>اعضای فعال تیم</b> ({count})\nبرای دیدن جزئیات یا غیرفعال‌سازی، روی نام بزنید."
+MEMBERS_HANDOVER_TITLE = "⚠️ <b>اعضای غیرفعالی که کار باز دارند</b>\nروی نام بزنید تا کارهایشان را بسپارید."
+MEMBER_BUTTON = "{name} — {role} · {open}"
+MEMBER_CARD = (
+    "👤 <b>{name}</b>\n"
+    "نقش: {role}\n"
+    "نام کاربری: {username}\n"
+    "وضعیت: {status}\n"
+    "دسترسی‌ها: {caps}\n\n"
+    "📋 کارهای باز: {open}\n"
+    "🔁 کارهای تکراری: {recurrences}"
+)
+MEMBER_STATUS_ACTIVE = "✅ فعال"
+MEMBER_STATUS_INACTIVE = "⛔️ غیرفعال از {when}"
+MEMBER_NO_CAPS = "—"
+MEMBER_TASK_LINE = "\n• {code} · {title} — {status}"
+MEMBER_REC_LINE = "\n• 🔁 {title}"
+BTN_DEACTIVATE = "⛔️ غیرفعال‌سازی"
+BTN_DEACTIVATE_YES = "⛔️ بله، غیرفعال کن"
+BTN_BACK_TO_MEMBERS = "↩️ بازگشت به اعضا"
+BTN_TRANSFER_ALL = "📦 انتقال همهٔ کارها به…"
+BTN_TRANSFER_TASK = "📋 {code} · {title}"
+BTN_TRANSFER_REC = "🔁 {title}"
+DEACTIVATE_CONFIRM = (
+    "⛔️ <b>غیرفعال‌سازی {name}</b>\n\n"
+    "• دیگر به ربات دسترسی ندارد و پیامی از ربات نمی‌گیرد.\n"
+    "• نام و تاریخچهٔ کارهایش در همهٔ سوابق می‌ماند.\n"
+    "• بعد از غیرفعال‌سازی، کارهای بازش را به نفر دیگری می‌سپارید.\n\n"
+    "مطمئن هستید؟"
+)
+DEACTIVATED_DONE = "✅ <b>{name}</b> غیرفعال شد."
+DEACTIVATED_DELEGATION = "\n🔁 تفویض فعالی که به او مربوط بود لغو شد."
+CAPS_WARNING = "\n\n⚠️ <b>این دسترسی‌ها حالا هیچ عضو فعال دیگری ندارد:</b>\n{caps}\nبرای تعیین جایگزین به مالک ربات خبر بدهید."
+CAPS_COVERED = "\n\nدسترسی‌های خاص او را عضو دیگری هم دارد. ✅"
+HANDOVER_TITLE = "\n\n📦 <b>کارهای باز برای سپردن</b> ({tasks} تسک، {recs} کار تکراری)"
+HANDOVER_NOTHING = "\n\nکار بازی برای سپردن ندارد. ✅"
+HANDOVER_HINT = "\nهمه را یک‌جا بسپارید یا روی هر مورد بزنید."
+HANDOVER_PICK_ALL = "📦 همهٔ {count} تسک باز {name} به چه کسی سپرده شود؟"
+HANDOVER_PICK_TASK = "📋 تسک <b>{code}</b> به چه کسی سپرده شود؟"
+HANDOVER_PICK_REC = "🔁 کار تکراری «{title}» از این به بعد با چه کسی باشد؟"
+HANDOVER_ALL_DONE = "✅ {count} تسک به <b>{name}</b> سپرده شد و به او اطلاع داده شد."
+HANDOVER_TASK_DONE = "✅ تسک <b>{code}</b> به <b>{name}</b> سپرده شد."
+HANDOVER_REC_DONE = "✅ کار تکراری «{title}» از این به بعد با <b>{name}</b> است."
+HANDOVER_NO_TARGETS = "عضو فعال دیگری برای سپردن کار نیست."
+NOTIFY_USER_DEACTIVATED = (
+    "⛔️ <b>{name}</b> ({role}) توسط {actor} غیرفعال شد.\n"
+    "کارهای باز: {open} · کارهای تکراری: {recs}"
+)
+NOTIFY_USER_DEACTIVATED_CAPS = "\n⚠️ این دسترسی‌ها حالا هیچ عضو فعال دیگری ندارد:\n{caps}"
+
+CAPABILITY_LABELS: dict[str, str] = {
+    "APPROVE_FINAL": "تأیید نهایی",
+    "DELEGATE": "تفویض",
+    "MANAGE_USERS": "مدیریت تیم",
+    "CREATE_TASK": "ساخت تسک",
+    "VIEW_ALL_TASKS": "دیدن همهٔ کارها",
+    "RECEIVE_OVERDUE_ALERTS": "دریافت هشدار تأخیر",
+    "RECEIVE_WEEKLY_REPORT": "دریافت گزارش هفتگی",
+    "CREATE_REEL": "ساخت ریل",
+    "REVIEW_L1": "بررسی مرحلهٔ اول",
+    "PUBLISH": "ثبت انتشار",
+    "SYSTEM_ADMIN": "مدیر سیستم (هشدار خطا و بکاپ)",
+}
+
+VALIDATION_MESSAGES.update({
+    "deactivate_self": "نمی‌توانید خودتان را غیرفعال کنید.",
+    "deactivate_owner": "مالک ربات را نمی‌شود غیرفعال کرد.",
+    "handover_active_user": "این کار مال یک عضو فعال است؛ از کارت خود تسک مسئول را عوض کنید.",
+    "backup_disabled": "بکاپ فقط با دیتابیس SQLite روی همین سرور ممکن است.",
+    "no_targets": HANDOVER_NO_TARGETS,
+})
+ALREADY_INACTIVE = "این عضو قبلاً غیرفعال شده است."
+TASK_NOT_OPEN = "این تسک دیگر باز نیست."
+
+# ---- /health, /backup, errors (M6) ----------------------------------------------------
+
+HEALTH = (
+    "🩺 <b>وضعیت ربات</b> — {now}\n\n"
+    "⏱ روشن از: {uptime}\n"
+    "🔁 آخرین tick: {tick}\n"
+    "🗃 حجم دیتابیس: {db_size}\n"
+    "🗄 آخرین بکاپ: {backup}\n"
+    "📨 اعلان‌های در صف: {pending}\n"
+    "❗️ اعلان‌های ناموفق (۲۴ ساعت): {failed}\n"
+    "👥 اعضای فعال: {users}"
+)
+HEALTH_TICK_OK = "✅ {when}"
+HEALTH_TICK_LATE = "⚠️ {when} (بیش از ۵ دقیقه پیش)"
+HEALTH_NEVER = "هنوز نه"
+HEALTH_UNKNOWN = "نامعلوم"
+HEALTH_MB = "{mb} مگابایت"
+HEALTH_UPTIME = "{days} روز و {hours} ساعت و {minutes} دقیقه"
+BACKUP_STARTED = "🗄 در حال گرفتن بکاپ…"
+BACKUP_MANUAL_CAPTION = "🗄 بکاپ دستی دیتابیس Eventum HQ — {date}"
+BACKUP_TOO_BIG_MANUAL = (
+    "⚠️ بکاپ گرفته شد، ولی {size} مگابایت است و از راه تلگرام فرستاده نمی‌شود. روی سرور است:\n<code>{path}</code>"
+)
+ERROR_REPORTED = "⚠️ مشکلی پیش آمد. به مدیر سیستم اطلاع داده شد. لطفاً کمی بعد دوباره امتحان کنید."
+NOTIFY_SYSTEM_ERROR = (
+    "🚨 <b>خطا در ربات</b>\n"
+    "نوع: <code>{error}</code>\n"
+    "محل: <code>{where}</code>\n"
+    "پیام: <code>{message}</code>\n\n"
+    "جزئیات کامل در لاگ <code>data/logs/</code> است. "
+    "تا ۱۰ دقیقه هشدار تکراری از همین نوع فرستاده نمی‌شود."
+)
+ALL_CAPABILITIES_LABEL = "همه (مالک ربات)"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from html import escape
 
 from eventum_hq.bot import texts
@@ -19,11 +19,13 @@ from eventum_hq.models import (
     User,
 )
 from eventum_hq.services.deadlines import SCOPE_MINE, OverdueRow
+from eventum_hq.services.offboarding import MemberView
 from eventum_hq.services.outputs import OutputDetail, OutputRow
 from eventum_hq.services.recurrences import RecurrenceRow
 from eventum_hq.services.reels import ReelView
 from eventum_hq.services.reports import DailyPlan, SaturdayReport, TaskLine, WeeklySummary
 from eventum_hq.services.reviews import ReviewView
+from eventum_hq.services.system import HealthReport
 from eventum_hq.services.tasks import (
     DeadlineState,
     HistoryEntry,
@@ -493,3 +495,87 @@ def output_detail_text(detail: OutputDetail) -> str:
     elif not detail.links:
         text += texts.LIB_DETAIL_NO_FILES
     return text
+
+# ---- 👤 members / offboarding (M6) -------------------------------------------------
+
+
+def capability_labels(values: list[str]) -> str:
+    return "، ".join(texts.CAPABILITY_LABELS.get(v, esc(v)) for v in values) or texts.MEMBER_NO_CAPS
+
+
+def member_card_text(view: MemberView) -> str:
+    user = view.user
+    if user.is_active:
+        status = texts.MEMBER_STATUS_ACTIVE
+    else:
+        when = format_jalali_datetime(user.deactivated_at) if user.deactivated_at else texts.HEALTH_UNKNOWN
+        status = texts.MEMBER_STATUS_INACTIVE.format(when=when)
+    caps = list(user.capabilities or [])
+    if user.role == Role.OWNER:
+        caps = ["*"]
+    text = texts.MEMBER_CARD.format(
+        name=user_label(user), role=role_label(user.role), username=display_username(user.username),
+        status=status,
+        caps=texts.ALL_CAPABILITIES_LABEL if caps == ["*"] else capability_labels(caps),
+        open=fa_digits(len(view.open_tasks)), recurrences=fa_digits(len(view.recurrences)),
+    )
+    for task in view.open_tasks:
+        text += texts.MEMBER_TASK_LINE.format(code=esc(task.code), title=esc(_short(task.title, 40)),
+                                              status=status_label(task))
+    for recurrence in view.recurrences:
+        text += texts.MEMBER_REC_LINE.format(title=esc(_short(recurrence.title, 40)))
+    return text
+
+
+def offboarding_summary_text(view: MemberView) -> str:
+    text = texts.DEACTIVATED_DONE.format(name=user_label(view.user))
+    if view.delegation_revoked:
+        text += texts.DEACTIVATED_DELEGATION
+    missing = [g.capability.value for g in view.capabilities if not g.covered]
+    if missing:
+        text += texts.CAPS_WARNING.format(caps="\n".join(f"• {texts.CAPABILITY_LABELS.get(c, esc(c))}"
+                                                          for c in missing))
+    elif view.capabilities:
+        text += texts.CAPS_COVERED
+    text += handover_text(view)
+    return text
+
+
+def handover_text(view: MemberView) -> str:
+    if not view.open_tasks and not view.recurrences:
+        return texts.HANDOVER_NOTHING
+    return (texts.HANDOVER_TITLE.format(tasks=fa_digits(len(view.open_tasks)), recs=fa_digits(len(view.recurrences)))
+            + texts.HANDOVER_HINT)
+
+
+# ---- /health (M6) -------------------------------------------------------------------------
+
+
+def _uptime(delta: timedelta) -> str:
+    minutes = int(delta.total_seconds() // 60)
+    days, rest = divmod(minutes, 24 * 60)
+    hours, mins = divmod(rest, 60)
+    return fa_digits(texts.HEALTH_UPTIME.format(days=days, hours=hours, minutes=mins))
+
+
+def _megabytes(size: int | None) -> str:
+    if size is None:
+        return texts.HEALTH_UNKNOWN
+    return fa_digits(texts.HEALTH_MB.format(mb=round(size / (1024 * 1024), 2)))
+
+
+def health_text(report: HealthReport) -> str:
+    if report.last_tick is None:
+        tick = texts.HEALTH_NEVER
+    else:
+        fmt = texts.HEALTH_TICK_OK if report.tick_ok else texts.HEALTH_TICK_LATE
+        tick = fmt.format(when=format_jalali_datetime(report.last_tick))
+    if report.last_backup is None:
+        backup = texts.HEALTH_NEVER
+    else:
+        backup = f"{format_jalali_datetime(report.last_backup)} — <code>{esc(report.last_backup_name)}</code>"
+    return texts.HEALTH.format(
+        now=format_jalali_datetime(report.now), uptime=_uptime(report.uptime), tick=tick,
+        db_size=_megabytes(report.db_size), backup=backup, pending=fa_digits(report.outbox_pending),
+        failed=fa_digits(report.outbox_failed_24h), users=fa_digits(report.active_users),
+    )

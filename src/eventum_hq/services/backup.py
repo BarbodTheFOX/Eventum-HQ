@@ -83,6 +83,20 @@ class BackupService:
         await asyncio.to_thread(_prune, self._folder, KEEP)
         return target
 
+    def latest(self) -> tuple[Path, float] | None:
+        """Newest daily copy and its modification time (POSIX seconds), or None."""
+        copies = sorted(self._folder.glob(f"{PREFIX}*.db")) if self._folder.exists() else []
+        if not copies:
+            return None
+        return copies[-1], copies[-1].stat().st_mtime
+
+    def database_size(self) -> int | None:
+        if self._source is None or not self._source.exists():
+            return None
+        size = self._source.stat().st_size
+        wal = self._source.with_name(self._source.name + "-wal")
+        return size + (wal.stat().st_size if wal.exists() else 0)
+
     async def weekly(self, day: date) -> WeeklyBackup | None:
         """Gzip the newest copy (making one for ``day`` if needed)."""
         if self._source is None:

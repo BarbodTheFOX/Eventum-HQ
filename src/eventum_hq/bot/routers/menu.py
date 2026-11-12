@@ -1,4 +1,4 @@
-"""Main menu, /menu, /help, /my, /cancel, admin view and the (still empty) sections."""
+"""Main menu, /menu, /help, /cancel, the admin view toggle and the catch-all fallback."""
 
 from __future__ import annotations
 
@@ -9,10 +9,14 @@ from aiogram.types import Message
 
 from eventum_hq.bot import texts
 from eventum_hq.bot.keyboards.main_menu import LABEL_TO_ITEM, AdminViews, main_menu, menu_for
-from eventum_hq.models import User
-from eventum_hq.services.permissions import MenuItem, can_use_menu_item
+from eventum_hq.models import Capability, User
+from eventum_hq.services.permissions import MenuItem, can_use_menu_item, has_capability
 
 router = Router(name="menu")
+
+
+def help_text(user: User) -> str:
+    return texts.HELP + (texts.HELP_ADMIN if has_capability(user, Capability.SYSTEM_ADMIN) else "")
 
 
 @router.message(Command("menu"))
@@ -22,7 +26,7 @@ async def cmd_menu(message: Message, current_user: User, admin_views: AdminViews
 
 @router.message(Command("help"))
 async def cmd_help(message: Message, current_user: User, admin_views: AdminViews) -> None:
-    await message.answer(texts.HELP, reply_markup=menu_for(current_user, admin_views))
+    await message.answer(help_text(current_user), reply_markup=menu_for(current_user, admin_views))
 
 
 @router.message(Command("cancel"))
@@ -58,7 +62,7 @@ async def _open_section(
         await message.answer(text, reply_markup=main_menu(user, admin_view=on))
         return
     if item == MenuItem.HELP:
-        await message.answer(texts.HELP, reply_markup=menu_for(user, admin_views))
+        await message.answer(help_text(user), reply_markup=menu_for(user, admin_views))
         return
     await message.answer(
         texts.COMING_SOON.format(label=texts.MENU_LABELS[item]),

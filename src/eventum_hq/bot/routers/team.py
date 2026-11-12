@@ -1,6 +1,7 @@
-"""👥 Team menu. M2: temporary delegation of final approval (F7).
+"""👥 Team menu: delegation of final approval (F7, M2), recurring tasks (F10, M5),
+members and offboarding (F15, M6 — see ``routers/members.py``).
 
-Users, roles, weekly capacity and offboarding are added in later milestones.
+Changing roles, capabilities and weekly capacity is Backlog B1 (not in v0).
 """
 
 from __future__ import annotations
@@ -13,8 +14,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from eventum_hq.bot import texts
-from eventum_hq.bot.formatters import format_jalali_datetime, user_label
+from eventum_hq.bot.formatters import fa_digits, format_jalali_datetime, user_label
 from eventum_hq.bot.keyboards.main_menu import AdminViews, menu_for
+from eventum_hq.bot.keyboards.members import team_members_rows
 from eventum_hq.bot.keyboards.recurrences import recurrences_button_row
 from eventum_hq.bot.keyboards.tasks import (
     TeamAction,
@@ -28,12 +30,14 @@ from eventum_hq.bot.task_ui import reply
 from eventum_hq.core.errors import AlreadyDecided, NotFound, PermissionDenied, ValidationFailed
 from eventum_hq.models import Capability, User
 from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.offboarding import OffboardingService
 from eventum_hq.services.permissions import MenuItem, can_use_menu_item, has_capability
 
 router = Router(name="team")
 
 
-async def _team_text(delegations: DelegationService) -> tuple[str, int | None]:
+async def _team_text(delegations: DelegationService, offboarding: OffboardingService,
+                     user: User) -> tuple[str, int | None, int]:
     current = await delegations.current()
     if current is None:
         status, active_id = texts.TEAM_NO_DELEGATION, None
@@ -42,11 +46,22 @@ async def _team_text(delegations: DelegationService) -> tuple[str, int | None]:
             to_name=user_label(current.to_user), ends=format_jalali_datetime(current.delegation.ends_at)
         )
         active_id = current.delegation.id
-    return texts.TEAM_MENU.format(delegation=status) + texts.TEAM_MORE_SOON, active_id
+    text = texts.TEAM_MENU.format(delegation=status)
+    pending = 0
+    if has_capability(user, Capability.MANAGE_USERS):
+        pending = len(await offboarding.pending_handovers(user))
+        orphans = await offboarding.orphan_recurrences(user)
+        if pending:
+            text += texts.TEAM_PENDING_HANDOVERS.format(count=fa_digits(pending))
+        if orphans:
+            text += texts.TEAM_ORPHAN_RECURRENCES.format(count=fa_digits(orphans))
+    return text + texts.TEAM_MORE_SOON, active_id, pending
 
 
-def _team_markup(user: User, active_id: int | None) -> InlineKeyboardMarkup:
+def _team_markup(user: User, active_id: int | None, pending: int) -> InlineKeyboardMarkup:
     markup = team_keyboard(can_delegate=has_capability(user, Capability.DELEGATE), active_delegation_id=active_id)
+    if has_capability(user, Capability.MANAGE_USERS):  # 👤 members and offboarding (F15, M6)
+        markup.inline_keyboard[:0] = team_members_rows(pending)
     if has_capability(user, Capability.CREATE_TASK):  # 🔁 recurring tasks (F10, M5)
         markup.inline_keyboard.append(recurrences_button_row())
     return markup
@@ -54,18 +69,18 @@ def _team_markup(user: User, active_id: int | None) -> InlineKeyboardMarkup:
 
 @router.message(F.text == texts.MENU_LABELS[MenuItem.TEAM])
 async def menu_team(message: Message, state: FSMContext, current_user: User, delegations: DelegationService,
-                    admin_views: AdminViews) -> None:
+                    admin_views: AdminViews, offboarding: OffboardingService) -> None:
     await state.clear()
     if not can_use_menu_item(current_user, MenuItem.TEAM):
         await message.answer(texts.PERMISSION_DENIED, reply_markup=menu_for(current_user, admin_views))
         return
-    text, active_id = await _team_text(delegations)
-    await message.answer(text, reply_markup=_team_markup(current_user, active_id))
+    text, active_id, pending = await _team_text(delegations, offboarding, current_user)
+    await message.answer(text, reply_markup=_team_markup(current_user, active_id, pending))
 
 
 @router.callback_query(TeamCb.filter())
 async def on_team(query: CallbackQuery, callback_data: TeamCb, state: FSMContext, current_user: User,
-                  delegations: DelegationService) -> None:
+                  delegations: DelegationService, offboarding: OffboardingService) -> None:
     action = callback_data.action
     can_delegate = has_capability(current_user, Capability.DELEGATE)
     if not can_use_menu_item(current_user, MenuItem.TEAM) or (action != TeamAction.HOME and not can_delegate):
@@ -74,8 +89,8 @@ async def on_team(query: CallbackQuery, callback_data: TeamCb, state: FSMContext
 
     if action == TeamAction.HOME:
         await state.clear()
-        text, active_id = await _team_text(delegations)
-        await reply(query, text, _team_markup(current_user, active_id))
+        text, active_id, pending = await _team_text(delegations, offboarding, current_user)
+        await reply(query, text, _team_markup(current_user, active_id, pending))
     elif action == TeamAction.NEW_DELEGATION:
         candidates = await delegations.candidates()
         if not candidates:
@@ -95,9 +110,9 @@ async def on_team(query: CallbackQuery, callback_data: TeamCb, state: FSMContext
         except (PermissionDenied, NotFound):
             await query.answer(texts.PERMISSION_DENIED, show_alert=True)
             return
-        text, active_id = await _team_text(delegations)
+        text, active_id, pending = await _team_text(delegations, offboarding, current_user)
         await reply(query, texts.DELEGATION_REVOKED + "\n\n" + text,
-                    _team_markup(current_user, active_id))
+                    _team_markup(current_user, active_id, pending))
     await query.answer()
 
 

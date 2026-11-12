@@ -28,12 +28,14 @@ from eventum_hq.scheduler.tick import Scheduler
 from eventum_hq.services.backup import BackupService
 from eventum_hq.services.deadlines import DeadlineService
 from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.offboarding import OffboardingService
 from eventum_hq.services.outputs import LibraryService
 from eventum_hq.services.periodic import PeriodicService
 from eventum_hq.services.recurrences import RecurrenceService
 from eventum_hq.services.reels import ReelService
 from eventum_hq.services.reports import ReportService
 from eventum_hq.services.reviews import ReviewService
+from eventum_hq.services.system import SystemService
 from eventum_hq.services.notifications import OutboxStore
 from eventum_hq.services.tasks import TaskService
 from eventum_hq.services.users import UserService
@@ -58,6 +60,7 @@ async def run(settings: Settings) -> None:
     reports = ReportService(db, clock)
     db_file = sqlite_file_path(settings.database_url)
     backups = BackupService(db_file, (db_file.parent if db_file else settings.log_dir.parent) / "backups")
+    system = SystemService(db, clock, backups, secrets=[settings.bot_token.get_secret_value()])
 
     bot = build_bot(settings)
     archive = TelegramArchive(bot, settings.archive_channel_id)
@@ -67,12 +70,12 @@ async def run(settings: Settings) -> None:
                           deadlines, reports)
     scheduler = Scheduler(
         periodic=PeriodicService(db, clock, reports, backups, settings.team_group_id),
-        recurrences=recurrences, deadlines=deadlines, outbox=outbox,
+        recurrences=recurrences, deadlines=deadlines, outbox=outbox, on_error=system.report_error,
     )
     dp = build_dispatcher(
         settings=settings, users=users, tasks=tasks, reviews=reviews, delegations=delegations,
         reels=reels, archive=archive, outbox=outbox, clock=clock, recurrences=recurrences, reports=reports,
-        library=LibraryService(db),
+        library=LibraryService(db), offboarding=OffboardingService(db, clock, sync), system=system,
     )
     try:
         me = await bot.get_me()

@@ -38,3 +38,25 @@ async def count_pending(session: AsyncSession) -> int:
         select(func.count(Notification.id)).where(Notification.status == NotificationStatus.PENDING)
     )
     return int(result.scalar_one())
+
+
+async def cancel_pending_for_chat(session: AsyncSession, chat_id: int) -> int:
+    """Cancel every pending row for one chat (e.g. a user who was just deactivated)."""
+    result = await session.execute(
+        select(Notification).where(
+            Notification.chat_id == chat_id, Notification.status == NotificationStatus.PENDING
+        )
+    )
+    rows = list(result.scalars().all())
+    for row in rows:
+        row.status = NotificationStatus.CANCELLED
+    return len(rows)
+
+
+async def count_failed_since(session: AsyncSession, since: datetime) -> int:
+    result = await session.execute(
+        select(func.count(Notification.id)).where(
+            Notification.status == NotificationStatus.FAILED, Notification.updated_at >= since
+        )
+    )
+    return int(result.scalar_one())

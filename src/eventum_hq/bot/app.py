@@ -23,11 +23,13 @@ from eventum_hq.core.config import Settings
 from eventum_hq.core.timeutil import Clock
 from eventum_hq.integrations.telegram_archive import TelegramArchive
 from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.offboarding import OffboardingService
 from eventum_hq.services.outputs import LibraryService
 from eventum_hq.services.recurrences import RecurrenceService
 from eventum_hq.services.reels import ReelService
 from eventum_hq.services.reports import ReportService
 from eventum_hq.services.reviews import ReviewService
+from eventum_hq.services.system import SystemService
 from eventum_hq.services.tasks import TaskService
 from eventum_hq.services.users import UserService
 
@@ -57,6 +59,8 @@ def build_dispatcher(
     recurrences: RecurrenceService,
     reports: ReportService,
     library: LibraryService,
+    offboarding: OffboardingService,
+    system: SystemService,
 ) -> Dispatcher:
     admin_views = AdminViews()
     dp = Dispatcher(
@@ -70,6 +74,8 @@ def build_dispatcher(
         recurrences=recurrences,
         reports=reports,
         library=library,
+        offboarding=offboarding,
+        system=system,
         archive=archive,
         outbox=outbox,
         clock=clock,

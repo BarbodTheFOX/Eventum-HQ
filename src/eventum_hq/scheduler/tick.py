@@ -35,12 +35,14 @@ class Scheduler:
         deadlines: DeadlineService,
         outbox: Deliverer,
         interval: float = TICK_SECONDS,
+        on_error: Callable[[str, str, str], Awaitable[Any]] | None = None,
     ) -> None:
         self._periodic = periodic
         self._recurrences = recurrences
         self._deadlines = deadlines
         self._outbox = outbox
         self._interval = interval
+        self._on_error = on_error  # error alert to SYSTEM_ADMINs (M6)
 
     async def tick(self) -> dict[str, Any]:
         results: dict[str, Any] = {}
@@ -56,9 +58,11 @@ class Scheduler:
         for name, job in jobs:
             try:
                 results[name] = await job()
-            except Exception:
+            except Exception as exc:
                 log.exception("tick job %s failed", name)
                 results[name] = None
+                if self._on_error is not None:
+                    await self._on_error(type(exc).__name__, f"tick:{name}", str(exc))
         return results
 
     async def run_forever(self) -> None:

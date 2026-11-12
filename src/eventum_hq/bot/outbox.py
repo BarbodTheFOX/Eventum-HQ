@@ -51,6 +51,8 @@ from eventum_hq.models import Notification, TaskKind, TaskStatus
 from eventum_hq.services import deadlines as deadline_kinds
 from eventum_hq.services import periodic as periodic_kinds
 from eventum_hq.services import delegations as delegation_kinds
+from eventum_hq.services import offboarding as offboarding_kinds
+from eventum_hq.services import system as system_kinds
 from eventum_hq.services import reels as reel_kinds
 from eventum_hq.services import reviews as review_kinds
 from eventum_hq.services import tasks as task_kinds
@@ -215,6 +217,21 @@ async def render(row: Notification, ctx: RenderContext) -> Rendered:
     if kind == periodic_kinds.KIND_BACKUP_WEEKLY:
         caption = texts.BACKUP_WEEKLY_CAPTION.format(date=format_jalali_date(to_tehran(ctx.now()).date()))
         return Rendered(caption, document=str(payload["path"]))
+    if kind == system_kinds.KIND_SYSTEM_ERROR:
+        return Rendered(texts.NOTIFY_SYSTEM_ERROR.format(error=esc(payload.get("error", "")),
+                                                         where=esc(payload.get("where", "")),
+                                                         message=esc(payload.get("message", ""))))
+    if kind == offboarding_kinds.KIND_USER_DEACTIVATED:
+        text = texts.NOTIFY_USER_DEACTIVATED.format(
+            name=esc(payload.get("name") or ""), role=role_label(payload.get("role")),
+            actor=esc(payload.get("actor_name") or ""), open=fa_digits(payload.get("open_tasks", 0)),
+            recs=fa_digits(payload.get("recurrences", 0)),
+        )
+        missing = payload.get("missing") or []
+        if missing:
+            text += texts.NOTIFY_USER_DEACTIVATED_CAPS.format(
+                caps="\n".join(f"• {texts.CAPABILITY_LABELS.get(c, esc(c))}" for c in missing))
+        return Rendered(text)
     if kind == periodic_kinds.KIND_BACKUP_TOO_BIG:
         size_mb = round(int(payload.get("size", 0)) / (1024 * 1024), 1)
         return Rendered(texts.BACKUP_TOO_BIG.format(size=fa_digits(size_mb), path=esc(payload.get("path", ""))))

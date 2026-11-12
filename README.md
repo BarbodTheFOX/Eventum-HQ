@@ -69,6 +69,7 @@ docker compose logs -f
 - روی سرور (بدون فیلتر) `TELEGRAM_PROXY` را خالی بگذارید.
 - در Docker Desktop روی ویندوز، `127.0.0.1` به خود کانتینر اشاره می‌کند؛ به‌جایش از `socks5://host.docker.internal:10808` استفاده کنید و در VPN گزینهٔ «Allow connections from LAN» را روشن کنید.
 - به‌روزرسانی: `git pull && docker compose up -d --build`.
+- راهنمای کامل سرور، بکاپ و بازیابی: [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ---
 
@@ -81,8 +82,8 @@ src/eventum_hq/
   repositories/  دسترسی به دیتابیس
   services/      منطق کسب‌وکار (بدون aiogram)
   bot/           فقط تلگرام: routers، keyboards، texts، middlewares، outbox
-  scheduler/     (M5)
-  integrations/  (M2 و بعد)
+  scheduler/     tick هر ۶۰ ثانیه: یادآوری، تأخیر، گزارش، بکاپ
+  integrations/  کانال آرشیو تلگرام، آمادگی Codecks
 migrations/      Alembic
 tests/           unit/ و integration/
 data/            دیتابیس، بکاپ و لاگ (در git نیست)
