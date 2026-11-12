@@ -6,6 +6,7 @@ from eventum_hq.bot.routers import (
     deliver,
     errors,
     groups,
+    library,
     menu,
     recurrences,
     reels,
@@ -24,6 +25,7 @@ def build_root_router() -> Router:
     # - task_create (FSM steps) only takes free text, so commands and menu buttons
     #   fall through to the routers below and interrupt a flow (same for the
     #   deliver / review-notes flows);
+    # - library (search state) takes free text, T-/R- codes included, before the code lookups;
     # - tasks handles its own menu buttons before the generic menu router;
     # - the menu router ends with a catch-all fallback.
     root.include_routers(
@@ -38,6 +40,7 @@ def build_root_router() -> Router:
         team.router,
         recurrences.router,
         reports.router,
+        library.router,
         reels.router,
         tasks.router,
         menu.router,

@@ -115,7 +115,8 @@ HELP = (
     "/my — کارهای من\n"
     "/cancel — لغو کار نیمه‌تمام\n"
     "/help — همین راهنما\n\n"
-    "برای دیدن یک تسک، کد آن را بفرستید؛ مثلاً <code>T-0012</code>.\n\n"
+    "برای دیدن یک تسک، کد آن را بفرستید؛ مثلاً <code>T-0012</code>.\n"
+    "فایل نهایی هر کار تأییدشده را در «📚 کتابخانه» پیدا کنید.\n\n"
     "دکمه‌های منو بر اساس نقش شما نمایش داده می‌شوند. "
     "بخش‌ها به‌تدریج فعال می‌شوند."
 )
@@ -668,3 +669,61 @@ VALIDATION_MESSAGES.update({
     "due_before_create": "ساعت ددلاین باید بعد از ساعت ساخت باشد.",
     "assignee_invalid": "این مسئول دیگر فعال نیست. نفر دیگری را انتخاب کنید.",
 })
+
+# ---- 📚 library (F9, M4) ------------------------------------------------------
+
+LIBRARY_HOME = (
+    "📚 <b>کتابخانهٔ خروجی‌ها</b>\n\n"
+    "همهٔ کارهای تأییدشدهٔ نهایی این‌جا هستند.\n"
+    "🔎 برای جست‌وجو، هر متنی بفرستید: بخشی از عنوان، نام سری، کد (مثلاً <code>T-0012</code>) "
+    "یا نام مسئول.\n"
+    "یا یکی از دکمه‌ها را بزنید:"
+)
+BTN_LIB_RECENT = "🆕 ۱۰ خروجی آخر"
+BTN_LIB_KIND_REEL = "🎬 ریل"
+BTN_LIB_KIND_COVER = "🖼 کاور"
+BTN_LIB_KIND_OTHER = "📄 سایر"
+BTN_LIB_BY_SERIES = "🗂 بر اساس سری"
+BTN_LIB_HOME = "↩️ کتابخانه"
+BTN_LIB_BACK_TO_LIST = "↩️ بازگشت به لیست"
+LIB_KIND_TITLES = {
+    "reel": "🎬 ریل‌ها",
+    "cover": "🖼 کاورها",
+    "other": "📄 سایر خروجی‌ها",
+}
+LIB_TYPE_ICONS = {
+    "REEL_VIDEO": "🎬",
+    "REEL_COVER": "🖼",
+    "OTHER": "📄",
+}
+LIB_TYPE_LABELS = {
+    "REEL_VIDEO": "ویدیوی ریل",
+    "REEL_COVER": "کاور ریل",
+    "OTHER": "سایر",
+}
+LIB_RECENT_TITLE = "🆕 ۱۰ خروجی آخر"
+LIB_SERIES_TITLE = "🗂 سری «{name}»"
+LIB_SEARCH_TITLE = "🔎 نتیجهٔ جست‌وجوی «{query}»"
+LIB_LIST_HEADER = "<b>{title}</b> — {count} مورد"
+LIB_LIST_LINE = "\n{n}. {icon} <b>{code}</b> · {title}\n    👤 {owner} — {date}"
+LIB_EMPTY = "\n\nچیزی پیدا نشد."
+LIB_EMPTY_LIBRARY = "\n\nهنوز هیچ خروجی تأییدشده‌ای در کتابخانه نیست."
+LIB_SEARCH_EMPTY_HINT = "\n\nبخش کوتاه‌تری از عنوان یا نام را امتحان کنید."
+LIB_PICK_SERIES = "🗂 سری را انتخاب کنید:"
+LIB_NO_SERIES = "هنوز خروجی‌ای با سری مشخص ثبت نشده است."
+LIB_SEARCH_EXPIRED = "این جست‌وجو منقضی شده است. دوباره متن را بفرستید."
+LIB_DETAIL = (
+    "{icon} <b>{code}</b> · {title}\n\n"
+    "نوع: {type}\n"
+    "سری: {series}\n"
+    "مسئول: {owner}\n"
+    "تأیید نهایی: {approved}\n"
+    "نسخه: v{version}"
+)
+LIB_DETAIL_REEL = "\nریل: <b>{code}</b>"
+LIB_DETAIL_PUBLISHED = "\n\n🚀 <b>منتشرشده</b> — {when}\n🔗 {links}"
+LIB_DETAIL_LINKS = "\n\n🔗 <b>لینک‌های تحویل</b>\n{links}"
+LIB_DETAIL_FILES = "\n\n📎 {count} فایل در پیام‌های بعدی 👇"
+LIB_DETAIL_NO_FILES = "\n\n(این خروجی فایل ندارد.)"
+LIB_FILE_FAILED = "⚠️ ارسال یکی از فایل‌ها ممکن نشد."
+LIB_NOT_FOUND = "این خروجی پیدا نشد."

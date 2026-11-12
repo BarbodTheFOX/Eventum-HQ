@@ -8,8 +8,18 @@ from html import escape
 from eventum_hq.bot import texts
 from eventum_hq.core.jalali import jalali_date_parts, jalali_parts
 from eventum_hq.core.timeutil import to_tehran
-from eventum_hq.models import RecurrenceRule, Role, Task, TaskInputKind, TaskKind, TaskStatus, User
+from eventum_hq.models import (
+    ContentStatus,
+    RecurrenceRule,
+    Role,
+    Task,
+    TaskInputKind,
+    TaskKind,
+    TaskStatus,
+    User,
+)
 from eventum_hq.services.deadlines import SCOPE_MINE, OverdueRow
+from eventum_hq.services.outputs import OutputDetail, OutputRow
 from eventum_hq.services.recurrences import RecurrenceRow
 from eventum_hq.services.reels import ReelView
 from eventum_hq.services.reports import DailyPlan, SaturdayReport, TaskLine, WeeklySummary
@@ -437,4 +447,49 @@ def recurrence_list_text(rows: list[RecurrenceRow]) -> str:
             rule=recurrence_rule_label(r.rule, list(r.weekdays or [])),
             create=format_hhmm(r.create_time), due=format_hhmm(r.due_time),
         )
+    return text
+
+
+# ---- 📚 library (M4) ---------------------------------------------------------------
+
+
+def library_list_text(title: str, rows: list[OutputRow], page_rows: list[OutputRow], first_number: int,
+                      *, empty_text: str = texts.LIB_EMPTY) -> str:
+    text = texts.LIB_LIST_HEADER.format(title=title, count=fa_digits(len(rows)))
+    if not rows:
+        return text + empty_text
+    for n, row in enumerate(page_rows, start=first_number):
+        out = row.output
+        text += texts.LIB_LIST_LINE.format(
+            n=fa_digits(n), icon=texts.LIB_TYPE_ICONS.get(str(out.output_type), "📄"),
+            code=esc(row.task_code), title=esc(_short(out.title, 60)), owner=user_label(row.owner),
+            date=format_jalali_date(to_tehran(out.approved_at).date()),
+        )
+    return text
+
+
+def output_detail_text(detail: OutputDetail) -> str:
+    out = detail.output
+    type_key = str(out.output_type)
+    text = texts.LIB_DETAIL.format(
+        icon=texts.LIB_TYPE_ICONS.get(type_key, "📄"), code=esc(detail.task.code), title=esc(out.title),
+        type=texts.LIB_TYPE_LABELS.get(type_key, esc(type_key)),
+        series=esc(detail.series.name) if detail.series else texts.NO_SERIES,
+        owner=user_label(detail.owner), approved=format_jalali_datetime(out.approved_at),
+        version=fa_digits(detail.version),
+    )
+    item = detail.content_item
+    if item is not None:
+        text += texts.LIB_DETAIL_REEL.format(code=esc(item.code))
+        if item.status == ContentStatus.PUBLISHED and item.publish_links:
+            when = format_jalali_datetime(item.published_at) if item.published_at else texts.REPORT_NO_DATA
+            text += texts.LIB_DETAIL_PUBLISHED.format(
+                when=when, links="\n🔗 ".join(esc(link) for link in item.publish_links)
+            )
+    if detail.links:
+        text += texts.LIB_DETAIL_LINKS.format(links="\n".join(esc(link) for link in detail.links))
+    if detail.attachments:
+        text += texts.LIB_DETAIL_FILES.format(count=fa_digits(len(detail.attachments)))
+    elif not detail.links:
+        text += texts.LIB_DETAIL_NO_FILES
     return text

@@ -71,6 +71,12 @@ PURPOSE_REEL_DEADLINE = "reel_deadline"
 PURPOSE_PUBLISHED_AT = "published_at"
 
 
+class LibraryFlow(StatesGroup):
+    """📚 library is open: any free text is a search. Data: lib_query (last search text)."""
+
+    search = State()
+
+
 class RecurrenceFlow(StatesGroup):
     """➕ new recurring task (F10). Data: title, assignee_id, rule, weekdays, create_time, due_time, chain."""
 

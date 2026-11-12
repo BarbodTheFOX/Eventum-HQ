@@ -28,6 +28,7 @@ from eventum_hq.scheduler.tick import Scheduler
 from eventum_hq.services.backup import BackupService
 from eventum_hq.services.deadlines import DeadlineService
 from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.outputs import LibraryService
 from eventum_hq.services.periodic import PeriodicService
 from eventum_hq.services.recurrences import RecurrenceService
 from eventum_hq.services.reels import ReelService
@@ -71,6 +72,7 @@ async def run(settings: Settings) -> None:
     dp = build_dispatcher(
         settings=settings, users=users, tasks=tasks, reviews=reviews, delegations=delegations,
         reels=reels, archive=archive, outbox=outbox, clock=clock, recurrences=recurrences, reports=reports,
+        library=LibraryService(db),
     )
     try:
         me = await bot.get_me()

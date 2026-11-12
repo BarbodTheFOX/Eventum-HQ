@@ -25,6 +25,7 @@ from eventum_hq.bot import texts
 from eventum_hq.bot.keyboards.access import JOIN_PREFIX
 from eventum_hq.bot.keyboards.main_menu import AdminViews
 from eventum_hq.bot.outbox import OutboxSender
+from eventum_hq.bot.states import LibraryFlow
 from eventum_hq.core.timeutil import Clock
 from eventum_hq.services.delegations import DelegationService
 from eventum_hq.services.users import UserService
@@ -121,6 +122,7 @@ class OutboxFlushMiddleware(BaseMiddleware):
 
 FLOW_TIMEOUT = timedelta(minutes=30)
 _TOUCHED_KEY = "_touched"
+_SILENT_STATES = {LibraryFlow.search.state}
 
 
 class FlowTimeoutMiddleware(BaseMiddleware):
@@ -137,14 +139,17 @@ class FlowTimeoutMiddleware(BaseMiddleware):
 
     async def __call__(self, handler: Handler, event: TelegramObject, data: dict[str, Any]) -> Any:
         state: FSMContext | None = data.get("state")
-        if state is not None and await state.get_state() is not None:
+        current = await state.get_state() if state is not None else None
+        if state is not None and current is not None:
             touched = (await state.get_data()).get(_TOUCHED_KEY)
             now = self._clock.now().timestamp()
             if touched is not None and now - float(touched) > self._timeout.total_seconds():
                 await state.clear()
                 # state filters read this cached value, not the storage
                 data["raw_state"] = None
-                if isinstance(event, Message):
+                if current in _SILENT_STATES:
+                    pass  # browsing the library is not unfinished work: expire quietly
+                elif isinstance(event, Message):
                     await event.answer(texts.FLOW_EXPIRED)
                 elif isinstance(event, CallbackQuery) and isinstance(event.message, Message):
                     await event.message.answer(texts.FLOW_EXPIRED)

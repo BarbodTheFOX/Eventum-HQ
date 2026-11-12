@@ -29,7 +29,6 @@ from eventum_hq.core.errors import (
     PermissionDenied,
     ValidationFailed,
 )
-from eventum_hq.core.normalize import normalize_text
 from eventum_hq.core.timeutil import Clock
 from eventum_hq.integrations.sync import NoopSync, TaskSyncPort
 from eventum_hq.models import (
@@ -54,6 +53,7 @@ from eventum_hq.repositories import users as users_repo
 from eventum_hq.services import audit, reels
 from eventum_hq.services.delegations import active_delegate_id
 from eventum_hq.services.notifications import enqueue
+from eventum_hq.services.outputs import output_search_text
 from eventum_hq.services.permissions import (
     can_manage_task,
     has_capability,
@@ -341,9 +341,7 @@ class ReviewService:
             TaskKind.EDIT: OutputType.REEL_VIDEO,
             TaskKind.COVER: OutputType.REEL_COVER,
         }.get(task.kind, OutputType.OTHER)
-        search = " ".join(
-            part for part in (task.code, task.title, series.name if series else "", owner.full_name) if part
-        )
+        search = output_search_text(task.code, task.title, series.name if series else None, owner.full_name)
         session.add(
             Output(
                 task_id=task.id,
@@ -354,7 +352,7 @@ class ReviewService:
                 series_id=task.series_id,
                 owner_id=owner.id,
                 approved_at=now,
-                search_text=normalize_text(search),
+                search_text=search,
             )
         )
 
