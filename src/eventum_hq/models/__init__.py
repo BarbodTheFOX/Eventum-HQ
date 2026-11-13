@@ -2,6 +2,7 @@ from eventum_hq.models.base import Base
 from eventum_hq.models.entities import (
     AuditEvent,
     ContentItem,
+    DailyNote,
     Delegation,
     JobRun,
     Notification,
@@ -44,6 +45,7 @@ __all__ = [
     "ContentStatus",
     "ContentSubtype",
     "ContentType",
+    "DailyNote",
     "Delegation",
     "JobRun",
     "Notification",

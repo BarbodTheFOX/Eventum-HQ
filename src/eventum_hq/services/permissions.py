@@ -119,6 +119,7 @@ class MenuItem(StrEnum):
     NEW_TASK = "NEW_TASK"
     ALL_TASKS = "ALL_TASKS"
     REPORT = "REPORT"
+    DAILY_REPORT = "DAILY_REPORT"  # M7: evening notes + daily operations report
     TEAM = "TEAM"
     HELP = "HELP"
     ADMIN_VIEW_ON = "ADMIN_VIEW_ON"  # OWNER only
@@ -137,6 +138,7 @@ _MENU_RULES: tuple[tuple[MenuItem, Capability | None], ...] = (
     (MenuItem.NEW_TASK, C.CREATE_TASK),
     (MenuItem.ALL_TASKS, C.VIEW_ALL_TASKS),
     (MenuItem.REPORT, C.RECEIVE_WEEKLY_REPORT),
+    (MenuItem.DAILY_REPORT, C.RECEIVE_WEEKLY_REPORT),  # + the OWNER in normal view (below)
     (MenuItem.TEAM, C.MANAGE_USERS),
     (MenuItem.HELP, None),
 )
@@ -175,8 +177,8 @@ def visible_menu_items(
     if is_owner(user):
         if admin_view:
             return [*_items_for(ALL_CAPABILITIES), MenuItem.ADMIN_VIEW_OFF]
-        return [
-            *_items_for(_with_delegation(stored_capabilities(user), is_delegate)),
-            MenuItem.ADMIN_VIEW_ON,
-        ]
+        items = _items_for(_with_delegation(stored_capabilities(user), is_delegate))
+        if MenuItem.DAILY_REPORT not in items:  # the daily report is the OWNER's own tool
+            items.insert(items.index(MenuItem.HELP), MenuItem.DAILY_REPORT)
+        return [*items, MenuItem.ADMIN_VIEW_ON]
     return _items_for(_with_delegation(effective_capabilities(user), is_delegate))

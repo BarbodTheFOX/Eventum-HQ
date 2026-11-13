@@ -334,3 +334,18 @@ class JobRun(IdMixin, TimestampMixin, Base):
     job: Mapped[str] = mapped_column(String(64), nullable=False)
     run_key: Mapped[str] = mapped_column(String(64), nullable=False)
     ran_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class DailyNote(IdMixin, TimestampMixin, Base):
+    """One evening note for the daily operations report (M7); a report day merges all its notes.
+
+    ``report_date`` is the Tehran calendar day the note is for (notes written before
+    05:00 still belong to the previous day).
+    """
+
+    __tablename__ = "daily_notes"
+    __table_args__ = (Index(None, "report_date"),)
+
+    report_date: Mapped[date] = mapped_column(Date, nullable=False)
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)

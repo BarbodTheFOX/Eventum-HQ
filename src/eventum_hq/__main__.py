@@ -28,6 +28,7 @@ from eventum_hq.scheduler.tick import Scheduler
 from eventum_hq.services.backup import BackupService
 from eventum_hq.services.deadlines import DeadlineService
 from eventum_hq.services.delegations import DelegationService
+from eventum_hq.services.daily_report import DailyReportService
 from eventum_hq.services.offboarding import OffboardingService
 from eventum_hq.services.outputs import LibraryService
 from eventum_hq.services.periodic import PeriodicService
@@ -76,6 +77,7 @@ async def run(settings: Settings) -> None:
         settings=settings, users=users, tasks=tasks, reviews=reviews, delegations=delegations,
         reels=reels, archive=archive, outbox=outbox, clock=clock, recurrences=recurrences, reports=reports,
         library=LibraryService(db), offboarding=OffboardingService(db, clock, sync), system=system,
+        daily=DailyReportService(db, clock),
     )
     try:
         me = await bot.get_me()

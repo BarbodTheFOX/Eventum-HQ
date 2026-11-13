@@ -31,6 +31,7 @@ from eventum_hq.models import Role, Task, TaskStatus, User
 from eventum_hq.services.notifications import OutboxStore
 from eventum_hq.services.permissions import ROLE_DEFAULT_CAPABILITIES, MenuItem
 from eventum_hq.integrations.telegram_archive import TelegramArchive
+from eventum_hq.services.daily_report import DailyReportService
 from eventum_hq.services.deadlines import DeadlineService
 from eventum_hq.services.delegations import DelegationService
 from eventum_hq.services.backup import BackupService
@@ -88,6 +89,7 @@ class Harness:
         self.recurrences = RecurrenceService(db, clock)
         self.library = LibraryService(db)
         self.offboarding = OffboardingService(db, clock)
+        self.daily = DailyReportService(db, clock)
         self.system = SystemService(db, clock, backups or BackupService(None, Path("unused-backups")))
         self.outbox = outbox = OutboxSender(self.bot, OutboxStore(db, clock), users, self.tasks, clock,
                                             self.reviews, self.archive, self.reels, self.deadlines, self.reports)
@@ -97,7 +99,7 @@ class Harness:
             settings=settings, users=users, tasks=self.tasks, reviews=self.reviews,
             delegations=self.delegations, reels=self.reels, archive=self.archive, outbox=outbox, clock=clock,
             recurrences=self.recurrences, reports=self.reports, library=self.library,
-            offboarding=self.offboarding, system=self.system,
+            offboarding=self.offboarding, system=self.system, daily=self.daily,
         )
         self._n = 0
 
@@ -150,11 +152,11 @@ class Harness:
 def _detach_routers() -> None:
     """aiogram routers are module singletons; free them so the next test can attach them."""
     from eventum_hq.bot.routers import (
-        access, dates, deliver, errors, groups, library, members, menu, recurrences, reels, reports, review,
-        start, system, task_create, tasks, team,
+        access, daily, dates, deliver, errors, groups, library, members, menu, recurrences, reels, reports,
+        review, start, system, task_create, tasks, team,
     )
 
-    for module in (access, dates, deliver, errors, groups, library, members, menu, recurrences, reels, reports,
+    for module in (access, daily, dates, deliver, errors, groups, library, members, menu, recurrences, reels, reports,
                    review, start, system, task_create, tasks, team):
         module.router._parent_router = None
 

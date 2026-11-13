@@ -21,6 +21,7 @@ MENU_LABELS: dict[MenuItem, str] = {
     MenuItem.NEW_TASK: "➕ تسک جدید",
     MenuItem.ALL_TASKS: "🗂 همهٔ کارها",
     MenuItem.REPORT: "📊 گزارش",
+    MenuItem.DAILY_REPORT: "📝 گزارش روزانه",
     MenuItem.TEAM: "👥 تیم",
     MenuItem.HELP: "❓ راهنما",
     MenuItem.ADMIN_VIEW_ON: "🛠 حالت ادمین",
@@ -119,6 +120,7 @@ HELP = (
     "• یادآوری ددلاین ساعت ۱۰ روز ددلاین و ۲ ساعت قبل از آن می‌آید.\n"
     "• از ۲۳ تا ۹ صبح ربات پیامی نمی‌فرستد؛ پیام‌ها ساعت ۹ می‌رسند.\n"
     "• فایل نهایی هر کار تأییدشده را در «📚 کتابخانه» پیدا کنید.\n"
+    "• «📝 گزارش روزانه» (برای مدیر): یادداشت آخر شب را بفرستید تا گزارش روزانهٔ تیم ساخته شود.\n"
     "• برای دیدن یک تسک یا ریل، کدش را بفرستید؛ مثلاً <code>T-0012</code> یا <code>R-0003</code>.\n"
     "• تاریخ را این‌طور بنویسید: <code>1405/08/25 18:00</code> (سال و ساعت اختیاری‌اند).\n\n"
     "<b>دستورها</b>\n"
@@ -853,3 +855,76 @@ NOTIFY_SYSTEM_ERROR = (
     "تا ۱۰ دقیقه هشدار تکراری از همین نوع فرستاده نمی‌شود."
 )
 ALL_CAPABILITIES_LABEL = "همه (مالک ربات)"
+
+# ---- M7: daily operations report (📝 گزارش روزانه) -------------------------------
+
+DAILY_HOME = (
+    "📝 <b>گزارش روزانه — {date}</b>\n"
+    "یادداشت‌های ثبت‌شدهٔ امروز: {count}\n\n"
+    "یادداشت‌هایتان را همین‌جا بفرستید؛ می‌توانید در چند پیام بفرستید. "
+    "کار ربات (ریل‌های منتشرشده، تحویل‌ها، تأخیرها و ریل‌های بدون کاور) خودکار به گزارش اضافه می‌شود.\n\n"
+    "<b>شکل نوشتن</b>\n"
+    "• خطی که با <code>#</code> شروع شود یک بخش است: "
+    "<code>#انتشار</code>، <code>#ویدیو</code>، <code>#باز</code>، <code>#ساعت</code> یا هر اسم دیگر.\n"
+    "• خطی که با <code>:</code> تمام شود زیرعنوان است، مثل <code>اینستاگرام:</code>\n"
+    "• بقیهٔ خط‌ها هر کدام یک بند می‌شوند. <code>اقدام بعدی: …</code> عنوانش پررنگ می‌شود.\n"
+    "• زیر <code>#ساعت</code> هر خط یک نفر است: <code>امین ۶</code> یا <code>محدثه: مرخصی</code>\n\n"
+    "<b>نمونه</b>\n"
+    "<pre>#انتشار\nاینستاگرام:\n۱ پست کاروسل منتشر شد\n#ویدیو\nاقدام بعدی: تکمیل اطلاعات انتشار\n"
+    "#ساعت\nامین ۶</pre>\n"
+    "یادداشت‌های قبل از ساعت ۵ صبح هم برای گزارش دیروز حساب می‌شوند."
+)
+DAILY_NOTE_SAVED = "✅ ثبت شد. یادداشت‌های امروز: {count}\nادامه بدهید، یا «👁 پیش‌نمایش» را بزنید."
+DAILY_NOTES_EMPTY = "هنوز یادداشتی برای امروز ثبت نشده است."
+DAILY_NOTES_TITLE = "🗒 <b>یادداشت‌های {date}</b>\n"
+DAILY_NOTE_LINE = "\n<b>{n}. {author}</b> — {time}\n{text}\n"
+DAILY_CLEAR_CONFIRM = "🗑 همهٔ یادداشت‌هایی که <b>خودتان</b> امروز نوشته‌اید ({count} تا) پاک شوند؟ یادداشت‌های بقیه می‌ماند."
+DAILY_CLEARED = "🗑 {count} یادداشت پاک شد."
+DAILY_NOTHING_TO_CLEAR = "یادداشتی از شما برای امروز نیست."
+DAILY_NOTHING_TO_REPORT = "هنوز چیزی برای گزارش امروز نیست: نه یادداشتی ثبت شده و نه کاری در ربات."
+DAILY_PREVIEW_HINT = "👆 پیش‌نمایش گزارش. اگر درست است «✅ نهایی‌کردن» را بزنید، وگرنه یادداشت اضافه کنید."
+DAILY_FINAL_DONE = "✅ گزارش نهایی شد. پیام بالا را می‌توانید فوروارد کنید."
+DAILY_RICH_FALLBACK = "ℹ️ تلگرام قالب جدید گزارش را نپذیرفت؛ همان گزارش با قالب ساده فرستاده شد."
+BTN_DAILY_PREVIEW = "👁 پیش‌نمایش"
+BTN_DAILY_LIST = "🗒 یادداشت‌ها"
+BTN_DAILY_CLEAR = "🗑 پاک‌کردن یادداشت‌های من"
+BTN_DAILY_CLEAR_YES = "🗑 بله، پاک شود"
+BTN_DAILY_FINAL = "✅ نهایی‌کردن"
+BTN_DAILY_ADD = "✍️ افزودن یادداشت"
+BTN_DAILY_BACK = "↩️ برگشت"
+
+# the report itself (rich message, Markdown); English parts are part of the team's report style
+DAILY_BRAND = "EVENTUM SPACE"
+DAILY_TITLE = "DAILY OPERATIONS REPORT"
+DAILY_DATE_LINE = "{weekday} {d} {month} {y} | {gd} {gmonth} {gy}"
+DAILY_SECTION_TITLES = {
+    "PUBLISHING": "Content & Publishing — انتشار محتوا",
+    "VIDEO": "Weekly Video — ویدیوی هفتگی",
+    "NOTES": "Notes — یادداشت‌ها",
+    "PRODUCTION": "Production — تولید و تحویل",
+    "PENDING": "Pending & Follow-ups — موارد باز",
+    "HOURS": "Team Working Hours — ساعات کاری تیم",
+}
+DAILY_SECTION_HEADING = "{n:02d} | {title}"
+DAILY_FROM_BOT = "ثبت‌شده در ربات"
+DAILY_AUTO_PUBLISHED = "ریل «{title}» ({code}) منتشر شد."
+DAILY_AUTO_OUTPUTS = "خروجی‌های تأییدشدهٔ امروز: {items}"
+DAILY_AUTO_OUTPUT_PART = "{n} {label}"
+DAILY_AUTO_DELIVERED = "{name}: {n} تحویل ({codes})"
+DAILY_AUTO_OVERDUE = "{code} «{title}» — {name}، {delta}"
+DAILY_AUTO_AWAITING = "{n} کار منتظر تأیید نهایی است."
+DAILY_AUTO_NO_COVER = "ریل «{title}» ({code}) هنوز کاور تأییدشده ندارد."
+DAILY_HOURS_HEADER = "| # | نام | ساعت کاری |"
+DAILY_HOURS_TOTAL = "جمع"
+DAILY_HOURS_VALUE = "{n} ساعت"
+DAILY_HASHTAGS = "#گزارش_روزانه #{weekday} #{d}_{month}_{y}"
+JALALI_MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+                 "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"]
+ENGLISH_MONTHS = ["January", "February", "March", "April", "May", "June",
+                  "July", "August", "September", "October", "November", "December"]
+
+VALIDATION_MESSAGES.update({
+    "daily_note_empty": "یادداشت خالی است.",
+    "daily_note_too_long": "این یادداشت خیلی بلند است (حداکثر ۴۰۰۰ نویسه). آن را در چند پیام بفرستید.",
+    "daily_notes_full": "برای امروز به سقف ۶۰ یادداشت رسیدید. یادداشت‌های قبلی را در یک پیام جمع کنید.",
+})

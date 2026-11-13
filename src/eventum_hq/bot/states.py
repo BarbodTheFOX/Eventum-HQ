@@ -89,3 +89,9 @@ class RecurrenceFlow(StatesGroup):
     chain = State()
     estimate = State()
     confirm = State()
+
+
+class DailyReportFlow(StatesGroup):
+    """📝 daily report is open: every free text is an evening note (stored in the DB, not in FSM)."""
+
+    notes = State()

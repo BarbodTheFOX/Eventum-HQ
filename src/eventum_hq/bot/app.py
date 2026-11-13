@@ -22,6 +22,7 @@ from eventum_hq.bot.routers import build_root_router
 from eventum_hq.core.config import Settings
 from eventum_hq.core.timeutil import Clock
 from eventum_hq.integrations.telegram_archive import TelegramArchive
+from eventum_hq.services.daily_report import DailyReportService
 from eventum_hq.services.delegations import DelegationService
 from eventum_hq.services.offboarding import OffboardingService
 from eventum_hq.services.outputs import LibraryService
@@ -61,6 +62,7 @@ def build_dispatcher(
     library: LibraryService,
     offboarding: OffboardingService,
     system: SystemService,
+    daily: DailyReportService,
 ) -> Dispatcher:
     admin_views = AdminViews()
     dp = Dispatcher(
@@ -76,6 +78,7 @@ def build_dispatcher(
         library=library,
         offboarding=offboarding,
         system=system,
+        daily=daily,
         archive=archive,
         outbox=outbox,
         clock=clock,

@@ -2,6 +2,7 @@ from aiogram import Router
 
 from eventum_hq.bot.routers import (
     access,
+    daily,
     dates,
     deliver,
     errors,
@@ -27,6 +28,7 @@ def build_root_router() -> Router:
     # - task_create (FSM steps) only takes free text, so commands and menu buttons
     #   fall through to the routers below and interrupt a flow (same for the
     #   deliver / review-notes flows);
+    # - daily (notes state) and library (search state) take free text only in their own state;
     # - library (search state) takes free text, T-/R- codes included, before the code lookups;
     # - tasks handles its own menu buttons before the generic menu router;
     # - the menu router ends with a catch-all fallback.
@@ -44,6 +46,7 @@ def build_root_router() -> Router:
         members.router,
         recurrences.router,
         reports.router,
+        daily.router,
         library.router,
         reels.router,
         tasks.router,
