@@ -224,7 +224,7 @@ async def test_render_matches_the_team_report_shape(clock: FakeClock, team, dail
     md = render_markdown(report)
     lines = md.splitlines()
     assert lines[0] == "# EVENTUM SPACE" and lines[1] == "### DAILY OPERATIONS REPORT"
-    assert lines[2] == r"پنجشنبه ۲۱ آبان ۱۴۰۵ \| 12 November 2026"
+    assert lines[2] == "پنجشنبه ۲۱ آبان ۱۴۰۵ \\| ⁦12 November 2026⁩"
     headings = [line for line in lines if line.startswith("## ")]
     assert headings == [
         r"## 01 \| Content & Publishing — انتشار محتوا",

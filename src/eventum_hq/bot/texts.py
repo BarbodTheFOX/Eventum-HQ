@@ -896,7 +896,8 @@ BTN_DAILY_BACK = "↩️ برگشت"
 # the report itself (rich message, Markdown); English parts are part of the team's report style
 DAILY_BRAND = "EVENTUM SPACE"
 DAILY_TITLE = "DAILY OPERATIONS REPORT"
-DAILY_DATE_LINE = "{weekday} {d} {month} {y} | {gd} {gmonth} {gy}"
+# U+2066/U+2069 isolate the English date, so an RTL line does not show "November 2026 13"
+DAILY_DATE_LINE = "{weekday} {d} {month} {y} | ⁦{gd} {gmonth} {gy}⁩"
 DAILY_SECTION_TITLES = {
     "PUBLISHING": "Content & Publishing — انتشار محتوا",
     "VIDEO": "Weekly Video — ویدیوی هفتگی",
