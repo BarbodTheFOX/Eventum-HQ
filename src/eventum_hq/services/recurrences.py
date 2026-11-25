@@ -112,7 +112,8 @@ class RecurrenceService:
                 description=(data.description or "").strip() or None,
                 assignee_id=assignee.id,
                 series_id=data.series_id,
-                approval_chain=ApprovalChain(data.approval_chain),
+                approval_chain=(ApprovalChain.FINAL if data.approval_chain == ApprovalChain.NONE
+                                else ApprovalChain(data.approval_chain)),
                 rule=rule,
                 weekdays=weekdays,
                 create_time=data.create_time,
@@ -200,7 +201,8 @@ class RecurrenceService:
             assignee_id=assignee.id,
             created_by=recurrence.created_by,
             status=TaskStatus.TODO,
-            approval_chain=recurrence.approval_chain,
+            approval_chain=(ApprovalChain.FINAL if recurrence.approval_chain == ApprovalChain.NONE
+                            else recurrence.approval_chain),
             due_at=tehran_to_utc(day, recurrence.due_time),
             estimated_minutes=recurrence.estimated_minutes,
             revision_round=0,

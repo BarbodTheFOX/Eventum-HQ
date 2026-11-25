@@ -273,7 +273,7 @@ def new_task_series_keyboard(series: list[Series]) -> InlineKeyboardMarkup:
 
 
 def new_task_chain_keyboard() -> InlineKeyboardMarkup:
-    order = (ApprovalChain.FINAL, ApprovalChain.L1_FINAL, ApprovalChain.NONE)
+    order = (ApprovalChain.FINAL, ApprovalChain.L1_FINAL)
     rows = [[_btn(texts.CHAIN_LABELS[c], NewTaskCb(step=NewTaskStep.CHAIN, value=c.value))] for c in order]
     rows.append(_abort_row())
     return InlineKeyboardMarkup(inline_keyboard=rows)

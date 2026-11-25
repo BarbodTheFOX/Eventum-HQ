@@ -55,6 +55,16 @@ async def test_ensure_owner_creates_owner_once(db: Database, users: UserService)
     assert await _audit_actions(db) == ["user.owner_bootstrapped"]
 
 
+async def test_existing_owner_gets_management_without_final_approval(db: Database, users: UserService) -> None:
+    await add_user(db, telegram_id=OWNER_TG, role=Role.OWNER,
+                   capabilities=[Capability.PUBLISH, Capability.SYSTEM_ADMIN])
+    owner = await users.ensure_owner()
+    assert set(default_capabilities(Role.OWNER)).issubset(owner.capabilities)
+    assert Capability.APPROVE_FINAL.value not in owner.capabilities
+    await users.ensure_owner()
+    assert await _audit_actions(db) == ["user.owner_management_enabled"]
+
+
 async def test_ensure_owner_promotes_existing_user(db: Database, users: UserService) -> None:
     await add_user(
         db, telegram_id=OWNER_TG, role=Role.EDITOR, is_active=False,

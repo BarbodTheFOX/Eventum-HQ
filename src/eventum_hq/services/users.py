@@ -122,6 +122,15 @@ class UserService:
                 return user
 
             if user.role == Role.OWNER and user.can_use_bot:
+                required = default_capabilities(Role.OWNER)
+                if not set(required).issubset(user.capabilities or []):
+                    before = _snapshot(user)
+                    user.capabilities = list(dict.fromkeys([*(user.capabilities or []), *required]))
+                    await audit.record(
+                        session, actor_id=None, action="user.owner_management_enabled",
+                        entity_type=ENTITY, entity_id=user.id, at=now,
+                        data={"before": before, "after": _snapshot(user)},
+                    )
                 return user
 
             before = _snapshot(user)

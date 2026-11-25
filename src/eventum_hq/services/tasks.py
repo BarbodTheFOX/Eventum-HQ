@@ -182,6 +182,8 @@ class TaskService:
             raise ValidationFailed("description_too_long")
         due_at = ensure_utc(data.due_at)
         chain = ApprovalChain(data.approval_chain)
+        if chain == ApprovalChain.NONE:
+            chain = ApprovalChain.FINAL
         estimate = data.estimated_minutes
         if estimate is not None and not (0 < estimate <= ESTIMATE_MAX_MINUTES):
             raise ValidationFailed("estimate_invalid")
@@ -268,7 +270,7 @@ class TaskService:
                 )
             open_ = is_open(task.status)
             is_assignee = task.assignee_id == fresh.id
-            needs_review = task.approval_chain != ApprovalChain.NONE
+            needs_review = True  # Includes legacy NONE tasks: founder approval is mandatory.
             latest_version = await reviews_repo.max_version(session, task.id)
             inputs = tuple(await tasks_repo.inputs_of(session, task.id))
             item = await content_repo.get_item(session, task.content_item_id) if task.content_item_id else None

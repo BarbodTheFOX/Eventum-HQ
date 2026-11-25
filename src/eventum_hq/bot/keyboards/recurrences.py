@@ -91,7 +91,7 @@ def time_choice_keyboard(action: RecurAction, choices: tuple[str, ...]) -> Inlin
 
 
 def chain_keyboard() -> InlineKeyboardMarkup:
-    order = (ApprovalChain.FINAL, ApprovalChain.L1_FINAL, ApprovalChain.NONE)
+    order = (ApprovalChain.FINAL, ApprovalChain.L1_FINAL)
     rows = [[_btn(texts.CHAIN_LABELS[c], RecurCb(action=RecurAction.CHAIN, value=c.value))] for c in order]
     rows.append(_abort_row())
     return InlineKeyboardMarkup(inline_keyboard=rows)

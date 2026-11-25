@@ -47,7 +47,8 @@ FULL_MENU = [
 
 EXPECTED_MENU = {
     # Barbod's normal view: his own work + the daily report (M7) + the admin-view button
-    "barbod": [M.MY_TASKS, M.LIBRARY, M.READY_TO_PUBLISH, M.DAILY_REPORT, M.HELP, M.ADMIN_VIEW_ON],
+    "barbod": [M.MY_TASKS, M.LIBRARY, M.READY_TO_PUBLISH, M.NEW_TASK, M.ALL_TASKS,
+               M.REPORT, M.DAILY_REPORT, M.TEAM, M.HELP, M.ADMIN_VIEW_ON],
     "farid": [
         M.MY_TASKS, M.LIBRARY, M.APPROVAL_QUEUE, M.NEW_TASK, M.ALL_TASKS, M.REPORT, M.DAILY_REPORT, M.TEAM,
         M.HELP,
@@ -65,7 +66,8 @@ def test_menu_matches_handoff_for_each_team_member(person: str) -> None:
 
 
 def test_owner_admin_view_shows_everything() -> None:
-    assert visible_menu_items(TEAM["barbod"], admin_view=True) == [*FULL_MENU, M.ADMIN_VIEW_OFF]
+    assert visible_menu_items(TEAM["barbod"], admin_view=True) == [
+        *[i for i in FULL_MENU if i != M.APPROVAL_QUEUE], M.ADMIN_VIEW_OFF]
 
 
 @pytest.mark.parametrize("person", [p for p in TEAM if p != "barbod"])
@@ -82,7 +84,7 @@ def test_can_use_menu_item_agrees_with_visible_items(person: str, item: MenuItem
 
 @pytest.mark.parametrize("item", list(MenuItem))
 def test_owner_may_use_every_item_in_any_view(item: MenuItem) -> None:
-    assert can_use_menu_item(TEAM["barbod"], item)
+    assert can_use_menu_item(TEAM["barbod"], item) == (item != M.APPROVAL_QUEUE)
 
 
 def test_owner_has_every_capability_but_only_stored_ones_for_routing() -> None:

@@ -26,7 +26,10 @@ SELECTABLE_ROLES: tuple[Role, ...] = (
 # Capabilities stored on approval. OWNER implicitly has everything; the list
 # below is only what the OWNER's "normal view" menu is built from.
 ROLE_DEFAULT_CAPABILITIES: dict[Role, tuple[Capability, ...]] = {
-    Role.OWNER: (C.PUBLISH, C.SYSTEM_ADMIN),
+    Role.OWNER: (
+        C.PUBLISH, C.SYSTEM_ADMIN, C.CREATE_TASK, C.VIEW_ALL_TASKS,
+        C.MANAGE_USERS, C.RECEIVE_OVERDUE_ALERTS, C.RECEIVE_WEEKLY_REPORT,
+    ),
     Role.DIRECTOR: (
         C.APPROVE_FINAL,
         C.DELEGATE,
@@ -84,6 +87,12 @@ def require_capability(user: User, capability: Capability) -> None:
 
 def is_owner(user: User) -> bool:
     return user.can_use_bot and user.role == Role.OWNER
+
+
+def is_final_reviewer(user: User) -> bool:
+    """Only the active founder can decide final reviews; owner/delegation cannot bypass it."""
+    return (user.can_use_bot and user.role == Role.DIRECTOR
+            and C.APPROVE_FINAL in stored_capabilities(user))
 
 
 # ---- tasks (handoff §3.2) ----------------------------------------------------
@@ -151,7 +160,7 @@ def _items_for(capabilities: frozenset[Capability]) -> list[MenuItem]:
 
 def _with_delegation(caps: frozenset[Capability], is_delegate: bool) -> frozenset[Capability]:
     # the temporary delegate (section 4.4) sees the approval queue while the delegation lasts
-    return caps | {C.APPROVE_FINAL} if is_delegate else caps
+    return caps
 
 
 def can_use_menu_item(user: User, item: MenuItem, *, is_delegate: bool = False) -> bool:
@@ -160,6 +169,8 @@ def can_use_menu_item(user: User, item: MenuItem, *, is_delegate: bool = False) 
         return False
     if item in _ADMIN_TOGGLES:
         return is_owner(user)
+    if item == MenuItem.APPROVAL_QUEUE:
+        return is_final_reviewer(user)
     return item in _items_for(_with_delegation(effective_capabilities(user), is_delegate))
 
 
@@ -176,7 +187,8 @@ def visible_menu_items(
         return []
     if is_owner(user):
         if admin_view:
-            return [*_items_for(ALL_CAPABILITIES), MenuItem.ADMIN_VIEW_OFF]
+            return [i for i in [*_items_for(ALL_CAPABILITIES), MenuItem.ADMIN_VIEW_OFF]
+                    if i != MenuItem.APPROVAL_QUEUE]
         items = _items_for(_with_delegation(stored_capabilities(user), is_delegate))
         if MenuItem.DAILY_REPORT not in items:  # the daily report is the OWNER's own tool
             items.insert(items.index(MenuItem.HELP), MenuItem.DAILY_REPORT)

@@ -185,11 +185,9 @@ async def test_none_chain_done_button(h: Harness, db: Database, clock: FakeClock
     await h.text(SINA, task.code)
     card = [c for c in h.session.calls if isinstance(c, SendMessage) and c.chat_id == SINA][-1]
     labels = [b.text for row in card.reply_markup.inline_keyboard for b in row]
-    assert texts.BTN_MARK_DONE in labels and texts.BTN_SUBMIT not in labels
-    await h.press(SINA, f"t:sub:{task.id}:0")  # forged: delivery is not allowed for NONE
-    assert texts.TASK_STATE_CHANGED in h.alerts()
+    assert texts.BTN_MARK_DONE not in labels and texts.BTN_SUBMIT in labels
     await h.press(SINA, f"t:done:{task.id}:0")
-    assert (await _tasks(db))[-1].status == TaskStatus.DONE
+    assert (await _tasks(db))[-1].status == TaskStatus.TODO
 
 
 async def test_amin_l1_queue_and_review_card(h: Harness, db: Database, clock: FakeClock) -> None:
@@ -219,23 +217,11 @@ async def test_delegation_from_team_menu(h: Harness, db: Database) -> None:
     assert h.last_text(AMIN) == texts.PERMISSION_DENIED
 
     await h.text(FARID, texts.MENU_LABELS[MenuItem.TEAM])
-    assert texts.TEAM_NO_DELEGATION in h.last_text(FARID)
+    assert texts.FOUNDER_APPROVAL_REQUIRED in h.last_text(FARID)
     await h.press(FARID, "tm:newdel:0")
-    assert h.last_text(FARID) == texts.DELEGATION_PICK
+    assert texts.FOUNDER_APPROVAL_REQUIRED in h.alerts()
     await h.press(FARID, f"tm:pick:{amin_id}")
-    await h.press(FARID, "dt:q:tomorrow")
-    await h.press(FARID, "dt:t:1800")
-    assert any("تفویض شد" in t for t in h.texts_to(FARID))
-    assert any(t.startswith("🔁") for t in h.texts_to(AMIN))
-
-    await h.text(AMIN, texts.MENU_LABELS[MenuItem.APPROVAL_QUEUE])
-    assert h.last_text(AMIN) == texts.QUEUE_EMPTY  # allowed now
-
-    current = await h.delegations.current()
-    assert current is not None
-    await h.press(FARID, f"tm:revoke:{current.delegation.id}")
-    assert any(texts.DELEGATION_REVOKED in t for t in h.texts_to(FARID))
-    assert any(t.startswith("⛔️ <b>") for t in h.texts_to(AMIN))  # Amin is told too
+    assert await h.delegations.current() is None
     await h.text(AMIN, texts.MENU_LABELS[MenuItem.APPROVAL_QUEUE])
     assert h.last_text(AMIN) == texts.PERMISSION_DENIED
 

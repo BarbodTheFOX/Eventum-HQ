@@ -36,8 +36,8 @@ ADMIN_VIEW_DISABLED = "↩️ حالت عادی: منو فقط بخش‌های �
 # ---- roles -------------------------------------------------------------------
 
 ROLE_LABELS: dict[Role, str] = {
-    Role.OWNER: "مالک (توسعه‌دهنده)",
-    Role.DIRECTOR: "مدیر",
+    Role.OWNER: "مدیر (مالک ربات)",
+    Role.DIRECTOR: "فاندر",
     Role.PROJECT_MANAGER: "مدیر پروژه",
     Role.CONTENT_SPECIALIST: "کانتنت اسپشیالیست",
     Role.DESIGNER: "دیزاینر",
@@ -163,9 +163,9 @@ OVERDUE_EMOJI = "🔴"
 AT_RISK_EMOJI = "🟠"
 
 CHAIN_LABELS: dict[ApprovalChain, str] = {
-    ApprovalChain.FINAL: "فقط تأیید مدیر",
-    ApprovalChain.L1_FINAL: "بررسی مرحلهٔ اول، سپس تأیید مدیر",
-    ApprovalChain.NONE: "بدون تأیید (مسئول با «✅ انجام شد» تمام می‌کند)",
+    ApprovalChain.FINAL: "فقط تأیید فاندر",
+    ApprovalChain.L1_FINAL: "بررسی مرحلهٔ اول، سپس تأیید فاندر",
+    ApprovalChain.NONE: "تأیید فاندر الزامی است (کار قدیمی)",
 }
 
 WEEKDAYS = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"]  # Saturday = 0
@@ -304,7 +304,8 @@ DURATION_HOURS = "{h} ساعت"
 DURATION_HOURS_MINUTES = "{h} ساعت و {m} دقیقه"
 NEW_TASK_SERIES = "🗂 سری این تسک؟ (اختیاری)"
 BTN_NO_SERIES = "بدون سری"
-NEW_TASK_CHAIN = "✅ زنجیرهٔ تأیید؟\nپیش‌فرض: <b>فقط تأیید مدیر</b>."
+FOUNDER_APPROVAL_REQUIRED = "تأیید نهایی خروجی‌ها فقط با فاندر است و قابل تفویض نیست."
+NEW_TASK_CHAIN = "✅ زنجیرهٔ تأیید؟\nپیش‌فرض: <b>فقط تأیید فاندر</b>."
 NEW_TASK_CONFIRM = (
     "🧾 <b>بررسی نهایی</b>\n\n"
     "عنوان: {title}\n"
@@ -442,7 +443,7 @@ NOTIFY_DELEGATION_REVOKED = "⛔️ <b>تفویض تأیید نهایی لغو �
 
 # ---- M2: team menu and delegation ----------------------------------------------------
 
-TEAM_MENU = "👥 <b>تیم</b>\n\n🔁 تفویض تأیید نهایی: {delegation}"
+TEAM_MENU = "👥 <b>تیم</b>\n\n{delegation}"
 TEAM_NO_DELEGATION = "فعال نیست"
 TEAM_DELEGATION_ACTIVE = "{to_name} تا {ends}"
 TEAM_MORE_SOON = "\n\nتغییر نقش، دسترسی‌ها و ظرفیت هفتگی افراد در نسخه‌های بعدی اضافه می‌شود."

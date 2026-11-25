@@ -136,10 +136,10 @@ async def test_empty_submission_is_rejected(tasks, reviews, team, clock) -> None
         await _submit(reviews, team, task, files=[], links=[])
 
 
-async def test_none_chain_cannot_be_submitted(tasks, reviews, team, clock) -> None:
+async def test_none_chain_is_normalized_to_final(tasks, reviews, team, clock) -> None:
     task = await _task(tasks, team, clock, ApprovalChain.NONE)
-    with pytest.raises(InvalidTransition):
-        await _submit(reviews, team, task)
+    assert task.approval_chain == ApprovalChain.FINAL
+    await _submit(reviews, team, task)
 
 
 async def test_cannot_submit_while_in_review(tasks, reviews, team, clock) -> None:
@@ -193,10 +193,11 @@ async def test_only_final_reviewers_can_approve_final(tasks, reviews, team, cloc
         await reviews.approve(team[person], sub.id, 1, ReviewStage.FINAL)
 
 
-async def test_owner_can_step_in_on_final(tasks, reviews, team, clock) -> None:
+async def test_owner_cannot_step_in_on_final(tasks, reviews, team, clock) -> None:
     task = await _task(tasks, team, clock, ApprovalChain.FINAL)
     sub = await _submit(reviews, team, task)
-    assert (await reviews.approve(team["barbod"], sub.id, 1, ReviewStage.FINAL)).status == TaskStatus.APPROVED
+    with pytest.raises(PermissionDenied):
+        await reviews.approve(team["barbod"], sub.id, 1, ReviewStage.FINAL)
 
 
 async def test_changes_need_a_note(tasks, reviews, team, clock) -> None:
@@ -295,25 +296,26 @@ async def _delegate(delegations: DelegationService, team, clock, hours: int = 48
     return await delegations.create(team["farid"], team["amin"].id, clock.now() + timedelta(hours=hours))
 
 
-async def test_delegation_makes_l1_final(db, tasks, reviews, delegations, team, clock) -> None:
+async def test_delegation_cannot_skip_final(db, tasks, reviews, delegations, team, clock) -> None:
     await _delegate(delegations, team, clock)
     task = await _task(tasks, team, clock, ApprovalChain.L1_FINAL)
     sub = await _submit(reviews, team, task)
     t = await reviews.approve(team["amin"], sub.id, 1, ReviewStage.L1)
-    assert t.status == TaskStatus.APPROVED  # FINAL stage skipped
+    assert t.status == TaskStatus.IN_REVIEW and t.review_stage == ReviewStage.FINAL
     review = (await _all(db, Review))[-1]
-    assert review.delegated is True
-    assert (FARID, KIND_REVIEW_REQUESTED) not in await _notes(db)
+    assert review.delegated is False
+    assert (FARID, KIND_REVIEW_REQUESTED) in await _notes(db)
+    assert await _all(db, Output) == []
 
 
-async def test_delegation_routes_final_chain_to_delegate(db, tasks, reviews, delegations, team, clock) -> None:
+async def test_delegation_cannot_reroute_final(db, tasks, reviews, delegations, team, clock) -> None:
     await _delegate(delegations, team, clock)
     task = await _task(tasks, team, clock, ApprovalChain.FINAL)
     sub = await _submit(reviews, team, task)
     notes = await _notes(db)
-    assert (AMIN, KIND_REVIEW_REQUESTED) in notes and (FARID, KIND_REVIEW_REQUESTED) not in notes
-    t = await reviews.approve(team["amin"], sub.id, 1, ReviewStage.FINAL)
-    assert t.status == TaskStatus.APPROVED and (await _all(db, Review))[-1].delegated
+    assert (AMIN, KIND_REVIEW_REQUESTED) not in notes and (FARID, KIND_REVIEW_REQUESTED) in notes
+    with pytest.raises(PermissionDenied):
+        await reviews.approve(team["amin"], sub.id, 1, ReviewStage.FINAL)
 
 
 async def test_expired_delegation_has_no_effect(db, tasks, reviews, delegations, team, clock) -> None:
@@ -362,10 +364,8 @@ async def test_delegation_rules(db, delegations, team, clock) -> None:
 
 async def test_none_chain_done(db, tasks, reviews, team, clock) -> None:
     task = await _task(tasks, team, clock, ApprovalChain.NONE)
-    with pytest.raises(PermissionDenied):
+    with pytest.raises(InvalidTransition):
         await reviews.mark_done(team["farid"], task.id)
-    done = await reviews.mark_done(team["sina"], task.id)
-    assert done.status == TaskStatus.DONE and done.first_submitted_at == clock.now()
     assert await _all(db, Output) == []
     with pytest.raises(InvalidTransition):
         await reviews.mark_done(team["sina"], task.id)
@@ -398,7 +398,7 @@ async def test_task_view_buttons(tasks, reviews, team, clock) -> None:
     assert view.can_finish and not view.can_submit
     none_task = await _task(tasks, team, clock, ApprovalChain.NONE)
     view = await tasks.get_view(team["sina"], task_id=none_task.id)
-    assert view.can_mark_done and not view.can_submit
+    assert not view.can_mark_done and view.can_submit
 
 
 async def test_review_queues(tasks, reviews, delegations, team, clock) -> None:
@@ -411,7 +411,8 @@ async def test_review_queues(tasks, reviews, delegations, team, clock) -> None:
     with pytest.raises(PermissionDenied):
         await reviews.queue(team["amin"], ReviewStage.FINAL)
     await _delegate(delegations, team, clock)
-    assert [r.task.id for r in await reviews.queue(team["amin"], ReviewStage.FINAL)] == [b.id]
+    with pytest.raises(PermissionDenied):
+        await reviews.queue(team["amin"], ReviewStage.FINAL)
     with pytest.raises(PermissionDenied):
         await reviews.queue(team["sina"], ReviewStage.L1)
 
@@ -428,3 +429,35 @@ async def test_on_time_uses_first_submission_only(db, tasks, reviews, team, cloc
     t = await _reload(db, task.id)
     assert t.first_submitted_at is not None and t.due_at is not None
     assert t.first_submitted_at <= t.due_at
+
+
+async def test_missing_founder_keeps_submission_pending_without_owner_fallback(db, tasks, reviews, team, clock):
+    task = await _task(tasks, team, clock, ApprovalChain.FINAL)
+    async with db.transaction() as session:
+        founder = await session.get(User, team["farid"].id)
+        founder.is_active = False
+    sub = await _submit(reviews, team, task)
+    assert not [n for n in await _all(db, Notification) if n.kind == KIND_REVIEW_REQUESTED]
+    for person in ("farid", "barbod", "amin"):
+        with pytest.raises(PermissionDenied):
+            await reviews.approve(team[person], sub.id, 1, ReviewStage.FINAL)
+    assert (await _reload(db, task.id)).status == TaskStatus.IN_REVIEW
+    assert await _all(db, Output) == []
+    async with db.transaction() as session:
+        founder = await session.get(User, team["farid"].id)
+        founder.is_active = True
+    assert [r.task.id for r in await reviews.queue(team["farid"], ReviewStage.FINAL)] == [task.id]
+    await reviews.approve(team["farid"], sub.id, 1, ReviewStage.FINAL)
+
+
+async def test_legacy_none_task_requires_founder(db, tasks, reviews, team, clock):
+    task = await _task(tasks, team, clock, ApprovalChain.FINAL)
+    async with db.transaction() as session:
+        legacy = await session.get(Task, task.id)
+        legacy.approval_chain = ApprovalChain.NONE
+    with pytest.raises(InvalidTransition):
+        await reviews.mark_done(team["sina"], task.id)
+    sub = await _submit(reviews, team, task)
+    assert (await _reload(db, task.id)).review_stage == ReviewStage.FINAL
+    assert (FARID, KIND_REVIEW_REQUESTED) in await _notes(db)
+    await reviews.approve(team["farid"], sub.id, sub.version, ReviewStage.FINAL)

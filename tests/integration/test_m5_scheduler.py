@@ -19,6 +19,8 @@ from eventum_hq.core.db import Database
 from eventum_hq.core.errors import PermissionDenied, ValidationFailed
 from eventum_hq.core.jalali import tehran_to_utc
 from eventum_hq.models import (
+    ApprovalChain,
+    Recurrence,
     Notification,
     NotificationStatus,
     RecurrenceRule,
@@ -137,13 +139,14 @@ async def test_overdue_alert_then_daily_summary(db: Database, clock: FakeClock, 
     await deadlines.run()
     assert [r.chat_id for r in await _rows(db, dl.KIND_OVERDUE)] == [SINA]
     watch = await _rows(db, dl.KIND_OVERDUE_WATCH)
-    assert [r.chat_id for r in watch] == [FARID]  # stored RECEIVE_OVERDUE_ALERTS; not the OWNER
+    assert {r.chat_id for r in watch} == {people["owner"].telegram_id, FARID}
     assert watch[0].payload["assignee"] == "Sina"
 
     clock._now = at(10, 5, SAT + timedelta(days=1))
     await deadlines.run()
     daily = await _rows(db, dl.KIND_OVERDUE_DAILY)
-    assert sorted((r.chat_id, r.payload["scope"]) for r in daily) == [(FARID, "all"), (SINA, "mine")]
+    assert {(r.chat_id, r.payload["scope"]) for r in daily} == {
+        (people["owner"].telegram_id, "all"), (FARID, "all"), (SINA, "mine")}
     rows = await deadlines.overdue_for(people["sina"], dl.SCOPE_MINE)
     assert [r.task.id for r in rows] == [task.id]
 
@@ -244,6 +247,20 @@ async def test_daily_recurrence_creates_one_task_per_day(db: Database, clock: Fa
     await service.deactivate(people["farid"], recurrence.id)
     clock._now = at(9, 0, SAT + timedelta(days=2))
     assert await service.generate_due() == []
+
+
+async def test_legacy_recurrence_cannot_create_unreviewed_tasks(db, clock, people):
+    service = RecurrenceService(db, clock)
+    clock._now = at(8, 0)
+    recurrence = await service.create(people["farid"], _daily(
+        people["sina"], approval_chain=ApprovalChain.NONE))
+    assert recurrence.approval_chain == ApprovalChain.FINAL
+    async with db.transaction() as session:
+        legacy = await session.get(Recurrence, recurrence.id)
+        legacy.approval_chain = ApprovalChain.NONE
+    clock._now = at(8, 31)
+    created = await service.generate_due()
+    assert len(created) == 1 and created[0].approval_chain == ApprovalChain.FINAL
 
 
 async def test_weekday_recurrence_uses_saturday_zero(db: Database, clock: FakeClock, people) -> None:

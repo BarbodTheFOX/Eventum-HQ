@@ -38,14 +38,7 @@ router = Router(name="team")
 
 async def _team_text(delegations: DelegationService, offboarding: OffboardingService,
                      user: User) -> tuple[str, int | None, int]:
-    current = await delegations.current()
-    if current is None:
-        status, active_id = texts.TEAM_NO_DELEGATION, None
-    else:
-        status = texts.TEAM_DELEGATION_ACTIVE.format(
-            to_name=user_label(current.to_user), ends=format_jalali_datetime(current.delegation.ends_at)
-        )
-        active_id = current.delegation.id
+    status, active_id = texts.FOUNDER_APPROVAL_REQUIRED, None
     text = texts.TEAM_MENU.format(delegation=status)
     pending = 0
     if has_capability(user, Capability.MANAGE_USERS):
@@ -59,7 +52,7 @@ async def _team_text(delegations: DelegationService, offboarding: OffboardingSer
 
 
 def _team_markup(user: User, active_id: int | None, pending: int) -> InlineKeyboardMarkup:
-    markup = team_keyboard(can_delegate=has_capability(user, Capability.DELEGATE), active_delegation_id=active_id)
+    markup = team_keyboard(can_delegate=False, active_delegation_id=None)
     if has_capability(user, Capability.MANAGE_USERS):  # 👤 members and offboarding (F15, M6)
         markup.inline_keyboard[:0] = team_members_rows(pending)
     if has_capability(user, Capability.CREATE_TASK):  # 🔁 recurring tasks (F10, M5)
@@ -85,6 +78,10 @@ async def on_team(query: CallbackQuery, callback_data: TeamCb, state: FSMContext
     can_delegate = has_capability(current_user, Capability.DELEGATE)
     if not can_use_menu_item(current_user, MenuItem.TEAM) or (action != TeamAction.HOME and not can_delegate):
         await query.answer(texts.PERMISSION_DENIED, show_alert=True)
+        return
+
+    if action != TeamAction.HOME:
+        await query.answer(texts.FOUNDER_APPROVAL_REQUIRED, show_alert=True)
         return
 
     if action == TeamAction.HOME:

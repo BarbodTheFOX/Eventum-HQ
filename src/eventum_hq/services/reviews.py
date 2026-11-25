@@ -1,10 +1,10 @@
 """Delivery, review, approval chains and the final "done" step (handoff §4.4, §4.7, §4.8, v1.2).
 
 Chains:
-* ``NONE``     — no review: the assignee's "✅ done" → DONE.
-* ``FINAL``    — Farid (stored APPROVE_FINAL) approves; during a delegation, the delegate.
-* ``L1_FINAL`` — Amin (REVIEW_L1), then Farid. During a delegation the delegate's
-                 L1 approval is final.
+* Legacy ``NONE`` tasks are submitted to FINAL; direct completion is forbidden.
+* ``FINAL`` — the active founder (DIRECTOR with APPROVE_FINAL) approves.
+* ``L1_FINAL`` — first-stage review, then mandatory founder approval.
+Delegations and the owner's implicit permissions never authorize final approval.
 
 After final approval a GENERIC task becomes APPROVED (waiting for the assignee's
 "🏁 done" after upload); reel tasks (M3) go straight to DONE.
@@ -51,13 +51,13 @@ from eventum_hq.repositories import series as series_repo
 from eventum_hq.repositories import tasks as tasks_repo
 from eventum_hq.repositories import users as users_repo
 from eventum_hq.services import audit, reels
-from eventum_hq.services.delegations import active_delegate_id
 from eventum_hq.services.notifications import enqueue
 from eventum_hq.services.outputs import output_search_text
 from eventum_hq.services.permissions import (
     can_manage_task,
     has_capability,
     is_owner,
+    is_final_reviewer,
     stored_capabilities,
 )
 from eventum_hq.services.task_states import ensure_transition
@@ -123,7 +123,7 @@ class ReviewService:
             if task.assignee_id != fresh.id:
                 raise PermissionDenied("task.submit")
             if task.approval_chain == ApprovalChain.NONE:
-                raise InvalidTransition(str(task.status), "SUBMIT_NONE_CHAIN")
+                task.approval_chain = ApprovalChain.FINAL
             if task.status not in SUBMITTABLE:
                 raise InvalidTransition(str(task.status), str(TaskStatus.IN_REVIEW))
             old_status = task.status
@@ -261,23 +261,12 @@ class ReviewService:
             ):
                 raise AlreadyDecided(str(task.status))
 
-            delegate_id = await active_delegate_id(session, now)
-            is_delegate = delegate_id == fresh.id
             if not await self._may_review(session, fresh, stage, now):
                 raise PermissionDenied(f"review.{stage}")
 
             old_status = task.status
-            final = False
+            final = approve and stage == ReviewStage.FINAL
             delegated = False
-            if approve:
-                if stage == ReviewStage.L1:
-                    final = is_delegate  # delegation: L1 approval is the final approval
-                    delegated = is_delegate
-                else:
-                    final = True
-                    delegated = is_delegate and not has_capability(fresh, Capability.APPROVE_FINAL)
-            elif stage == ReviewStage.FINAL:
-                delegated = is_delegate and not has_capability(fresh, Capability.APPROVE_FINAL)
 
             review = Review(
                 submission_id=submission.id,
@@ -359,7 +348,7 @@ class ReviewService:
     # ---- done ----------------------------------------------------------------
 
     async def mark_done(self, actor: User, task_id: int) -> Task:
-        """'✅ done' for NONE-chain tasks, or '🏁 done' after upload for APPROVED tasks (v1.2)."""
+        """Finish an already approved task after upload; no direct completion path."""
         now = self._clock.now()
         async with self._db.transaction() as session:
             fresh = await self._fresh(session, actor)
@@ -368,13 +357,6 @@ class ReviewService:
             if old_status == TaskStatus.APPROVED:
                 if task.assignee_id != fresh.id and not can_manage_task(fresh, task):
                     raise PermissionDenied("task.done")
-            elif task.approval_chain == ApprovalChain.NONE and old_status in (
-                TaskStatus.TODO, TaskStatus.IN_PROGRESS
-            ):
-                if task.assignee_id != fresh.id:
-                    raise PermissionDenied("task.done")
-                if task.first_submitted_at is None:
-                    task.first_submitted_at = now  # counts as delivery for on-time stats
             else:
                 raise InvalidTransition(str(old_status), str(TaskStatus.DONE))
             ensure_transition(old_status, TaskStatus.DONE)
@@ -395,21 +377,15 @@ class ReviewService:
     async def _may_review(self, session: AsyncSession, user: User, stage: ReviewStage, now: datetime) -> bool:
         if stage == ReviewStage.L1:
             return has_capability(user, Capability.REVIEW_L1)
-        if has_capability(user, Capability.APPROVE_FINAL):
-            return True
-        return await active_delegate_id(session, now) == user.id
+        return is_final_reviewer(user)
 
     async def _reviewers(self, session: AsyncSession, stage: ReviewStage, now: datetime) -> list[User]:
-        """Who receives the review card. Uses *stored* capabilities so the OWNER is a fallback only."""
+        """Final review has no owner fallback, even when no founder is active."""
         active = list(await users_repo.list_active(session))
         if stage == ReviewStage.L1:
             people = [u for u in active if Capability.REVIEW_L1 in stored_capabilities(u)]
         else:
-            delegate_id = await active_delegate_id(session, now)
-            if delegate_id is not None:
-                people = [u for u in active if u.id == delegate_id]
-            else:
-                people = [u for u in active if Capability.APPROVE_FINAL in stored_capabilities(u)]
+            return [u for u in active if is_final_reviewer(u)]
         return people or [u for u in active if is_owner(u)]
 
     async def _notify_reviewers(
